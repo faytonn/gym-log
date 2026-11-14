@@ -43,7 +43,11 @@ export function Finished({ session, settings, syncing, syncLabel, onSync, onDone
               <button type="button" className="btn btn-accent btn-block" disabled={syncing} onClick={onSync}>
                 {syncing ? 'Syncing…' : 'Sync to Google Sheets'}
               </button>
-              <p className="muted small">If you are offline it stays queued and retries automatically.</p>
+              <p className="muted small">
+                {settings.autoSync
+                  ? 'If you are offline it stays queued and retries automatically.'
+                  : 'If it fails it stays queued. Sync it later from History or Settings.'}
+              </p>
             </>
           )}
         </div>
