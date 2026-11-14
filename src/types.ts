@@ -87,6 +87,8 @@ export interface Settings {
   isolationRest: number;
   sound: boolean;
   keepAwake: boolean;
+  /** Sync queued sessions automatically when online. Off: only when you tap Sync. */
+  autoSync: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -96,4 +98,5 @@ export const DEFAULT_SETTINGS: Settings = {
   isolationRest: 75,
   sound: true,
   keepAwake: true,
+  autoSync: true,
 };
