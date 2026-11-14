@@ -30,7 +30,10 @@ export function Stepper({ label, value, step, min = 0, unit, decimal, onChange }
 
   return (
     <div className="stepper">
-      <span className="stepper-label">{label}</span>
+      <span className="stepper-label">
+        {label}
+        {unit && <span className="unit"> · {unit}</span>}
+      </span>
       <div className="stepper-row">
         <button type="button" className="step-btn" aria-label={`${label} minus ${step}`} onClick={() => set(value - step)}>
           −
@@ -49,7 +52,6 @@ export function Stepper({ label, value, step, min = 0, unit, decimal, onChange }
             onBlur={commit}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
-          {unit && <span className="unit">{unit}</span>}
         </label>
         <button type="button" className="step-btn" aria-label={`${label} plus ${step}`} onClick={() => set(value + step)}>
           +

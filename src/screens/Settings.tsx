@@ -92,8 +92,8 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
 
         <section className="card form">
           <h2>Rest timer</h2>
-          <Stepper label={`Compound · ${fmtDuration(settings.compoundRest * 1000)}`} unit="s" value={settings.compoundRest} step={15} min={15} onChange={(compoundRest) => set({ compoundRest })} />
-          <Stepper label={`Isolation · ${fmtDuration(settings.isolationRest * 1000)}`} unit="s" value={settings.isolationRest} step={15} min={15} onChange={(isolationRest) => set({ isolationRest })} />
+          <Stepper label={`Compound · ${fmtDuration(settings.compoundRest * 1000)}`} unit="seconds" value={settings.compoundRest} step={15} min={15} onChange={(compoundRest) => set({ compoundRest })} />
+          <Stepper label={`Isolation · ${fmtDuration(settings.isolationRest * 1000)}`} unit="seconds" value={settings.isolationRest} step={15} min={15} onChange={(isolationRest) => set({ isolationRest })} />
           <Toggle label="Beep when rest is over" checked={settings.sound} onChange={(sound) => set({ sound })} />
           <Toggle label="Keep screen on during workout" checked={settings.keepAwake} onChange={(keepAwake) => set({ keepAwake })} />
           <p className="small muted">iPhone stops timers while the screen is locked, so keep the screen on if you want the beep.</p>
