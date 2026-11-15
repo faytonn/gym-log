@@ -1515,3 +1515,46 @@ p {
 .demo-banner .btn {
   flex: none;
 }
+.demo-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.demo-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.demo-steps li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--dim);
+}
+.demo-steps li.now {
+  color: var(--muted);
+}
+.demo-steps li.done {
+  color: var(--text);
+}
+.demo-step-mark {
+  font: 600 12px/1.6 var(--mono);
+  color: var(--accent);
+}
+.demo-note {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.demo-note strong {
+  color: var(--text);
+}

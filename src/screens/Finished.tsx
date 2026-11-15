@@ -1,3 +1,5 @@
+import { DemoSync } from '../components/DemoSync';
+import { DEMO } from '../mode';
 import type { Session, Settings } from '../types';
 import { fmtDuration } from '../workout';
 
@@ -22,13 +24,15 @@ export function Finished({ session, settings, syncing, syncLabel, onSync, onDone
         <span className="lab">Session complete</span>
         <h1>Workout saved</h1>
         <p className="muted">
-          {session.dayLabel} · {session.dayName} · {session.entries.length} exercises · {sets} sets ·{' '}
+          {session.dayLabel} · {session.dayName} · {session.entries.length} exercise{session.entries.length === 1 ? '' : 's'} · {sets} set{sets === 1 ? '' : 's'} ·{' '}
           {fmtDuration(session.finishedAt - session.startedAt)}
         </p>
         <p className="muted small">Saved on this phone. It is safe even if syncing fails.</p>
 
         <div className="card sync-card">
-          {!configured ? (
+          {DEMO ? (
+            <DemoSync session={session} />
+          ) : !configured ? (
             <>
               <p>Google Sheets sync is not set up yet.</p>
               <button type="button" className="btn btn-secondary btn-block" onClick={onSettings}>
