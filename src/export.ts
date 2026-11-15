@@ -1,4 +1,5 @@
-import { fmtKg, workingWeight } from './progression';
+import { MUSCLE_LABEL, type MuscleTargets } from './muscles';
+import { fmtKg, roundKg, workingWeight } from './progression';
 import type { Session } from './types';
 
 /** Columns of the "Log" tab in the "Workout Log" Google Sheet. */
@@ -48,4 +49,61 @@ export function toCsv(sessions: Session[]): string {
   const lines = [SHEET_HEADER.map(csvCell).join(',')];
   for (const s of sorted) for (const r of sessionToRows(s)) lines.push(r.map(csvCell).join(','));
   return lines.join('\r\n') + '\r\n';
+}
+
+/** Columns of the "Sets" tab: one row per set. The summary tabs in the sheet are built from it. */
+export const SETS_HEADER = [
+  'Date',
+  'Session ID',
+  'Day',
+  'Exercise',
+  'Type',
+  'Set',
+  'Weight (kg)',
+  'Reps',
+  'Reps left in tank',
+  'Primary muscles',
+  'Secondary muscles',
+] as const;
+
+/** Columns of the "Sessions" tab: one row per workout. */
+export const SESSIONS_HEADER = ['Date', 'Session ID', 'Day', 'Start', 'Duration (min)', 'Exercises', 'Sets', 'Volume (kg)'] as const;
+
+export function sessionToSetRows(session: Session, targets: (name: string) => MuscleTargets): SheetRow[] {
+  const date = localDate(session.finishedAt);
+  const day = `${session.dayLabel} · ${session.dayName}`;
+  const rows: SheetRow[] = [];
+  for (const e of session.entries) {
+    const t = targets(e.name);
+    const primary = t.primaryMuscles.map((m) => MUSCLE_LABEL[m]).join(', ');
+    const secondary = t.secondaryMuscles
+      .filter((m) => !t.primaryMuscles.includes(m))
+      .map((m) => MUSCLE_LABEL[m])
+      .join(', ');
+    e.sets.forEach((s, i) => rows.push([date, session.id, day, e.name, e.kind, i + 1, roundKg(s.weight), s.reps, e.rir ?? '', primary, secondary]));
+  }
+  return rows;
+}
+
+/** Volume is weight × reps, counted for normally loaded exercises only (not assist or bodyweight). */
+export function sessionSummaryRow(session: Session): SheetRow {
+  const done = session.entries.filter((e) => e.sets.length > 0);
+  const start = new Date(session.startedAt);
+  const hhmm = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+  let sets = 0;
+  let volume = 0;
+  for (const e of done) {
+    sets += e.sets.length;
+    if (e.kind === 'weight') for (const s of e.sets) volume += s.weight * s.reps;
+  }
+  return [
+    localDate(session.finishedAt),
+    session.id,
+    `${session.dayLabel} · ${session.dayName}`,
+    hhmm,
+    Math.round((session.finishedAt - session.startedAt) / 60_000),
+    done.length,
+    sets,
+    roundKg(volume),
+  ];
 }

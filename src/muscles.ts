@@ -63,6 +63,11 @@ const DEFAULTS: Record<string, MuscleTargets> = {
   'db shoulder press': m(['front-delts'], ['side-delts', 'triceps']),
   'machine shoulder press': m(['front-delts'], ['side-delts', 'triceps']),
   'seated cable row': m(['upper-back', 'lats'], ['biceps', 'rear-delts']),
+  'wide-grip cable row': m(['upper-back'], ['rear-delts', 'lats', 'biceps']),
+  'face pull': m(['rear-delts', 'upper-back']),
+  '45° back extension': m(['glutes', 'hamstrings'], ['lower-back']),
+  'straight-arm cable pulldown': m(['lats']),
+  'low-to-high cable fly': m(['upper-chest'], ['front-delts']),
   'single-arm chest-supported row': m(['upper-back', 'lats'], ['rear-delts', 'biceps']),
   'assisted pull-up': m(['lats'], ['biceps', 'upper-back']),
   'lateral raise': m(['side-delts'], ['upper-back']),
@@ -160,13 +165,8 @@ export interface LoggedItem {
  * so fixing a mapping in Settings also fixes past weeks. Unknown names fall back to the defaults.
  */
 export function loggedVolume(items: LoggedItem[], plan: Plan, weekStart: number): Volume {
-  const byName = new Map<string, MuscleTargets>();
-  for (const d of plan.days) for (const ex of d.exercises) if (!byName.has(exerciseKey(ex.name))) byName.set(exerciseKey(ex.name), ex);
-  return weeklyVolume(
-    items
-      .filter((it) => it.at >= weekStart)
-      .map((it) => ({ ...(byName.get(exerciseKey(it.name)) ?? defaultMuscles(it.name)), sets: it.sets })),
-  );
+  const targets = targetsLookup(plan);
+  return weeklyVolume(items.filter((it) => it.at >= weekStart).map((it) => ({ ...targets(it.name), sets: it.sets })));
 }
 
 export type VolumeBand = 'none' | 'light' | 'medium' | 'strong';
@@ -185,4 +185,11 @@ export function sortedVolume(v: Volume): [Muscle, number][] {
 
 export function targetsOf(ex: Pick<PlanExercise, 'primaryMuscles' | 'secondaryMuscles'>): MuscleTargets {
   return { primaryMuscles: ex.primaryMuscles ?? [], secondaryMuscles: ex.secondaryMuscles ?? [] };
+}
+
+/** Muscles for an exercise name: the current plan first, then the default mapping. */
+export function targetsLookup(plan: Plan): (name: string) => MuscleTargets {
+  const byName = new Map<string, MuscleTargets>();
+  for (const d of plan.days) for (const ex of d.exercises) if (!byName.has(exerciseKey(ex.name))) byName.set(exerciseKey(ex.name), targetsOf(ex));
+  return (name) => byName.get(exerciseKey(name)) ?? defaultMuscles(name);
 }

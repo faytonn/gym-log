@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { SHEET_HEADER, sessionToRows, toCsv } from './export';
+import { SESSIONS_HEADER, SETS_HEADER, SHEET_HEADER, sessionSummaryRow, sessionToRows, sessionToSetRows, toCsv } from './export';
+import { defaultMuscles } from './muscles';
 import type { Session } from './types';
 
 const finishedAt = new Date(2026, 10, 14, 18, 30).getTime();
@@ -45,5 +46,29 @@ describe('toCsv', () => {
     expect(lines[0]).toBe('Date,Exercise,Weight (kg),Set 1,Set 2,Set 3,Set 4,Reps left in tank,Notes');
     expect(lines).toHaveLength(4);
     expect(lines[3]).toContain('"Incline DB press, ""heavy"""');
+  });
+});
+
+describe('sessionToSetRows and sessionSummaryRow', () => {
+  const targets = (name: string) => defaultMuscles(name);
+
+  it('writes one row per set with the muscles of the exercise', () => {
+    const rows = sessionToSetRows(s, targets);
+    expect(rows).toHaveLength(4 + 1 + 3);
+    expect(rows[0]).toEqual(['2026-11-14', 's1', 'Mon · Upper A', 'Lat pulldown', 'weight', 1, 42, 12, 2, 'Lats', 'Biceps, Rear delts, Upper back / traps']);
+    expect(rows[3].slice(5, 8)).toEqual([4, 42, 9]);
+    expect(rows[4].slice(3, 9)).toEqual(['Assisted pull-up', 'assist', 1, 35, 8, '']);
+    expect(rows.every((r) => r.length === SETS_HEADER.length)).toBe(true);
+  });
+
+  it('summarises the workout and leaves assist weight out of the volume', () => {
+    const row = sessionSummaryRow(s);
+    expect(row).toHaveLength(SESSIONS_HEADER.length);
+    expect(row.slice(0, 3)).toEqual(['2026-11-14', 's1', 'Mon · Upper A']);
+    expect(row[3]).toBe('17:30');
+    expect(row[4]).toBe(60);
+    expect(row[5]).toBe(3); // the exercise with no sets is not counted
+    expect(row[6]).toBe(8);
+    expect(row[7]).toBe(42 * (12 + 11 + 10 + 9) + 15 * 10 + 15 * 9 + 12.5 * 11);
   });
 });

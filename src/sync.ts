@@ -1,5 +1,6 @@
-import { db, loadSettings, pendingSessions } from './db';
-import { sessionToRows } from './export';
+import { db, loadPlan, loadSettings, pendingSessions } from './db';
+import { sessionSummaryRow, sessionToRows, sessionToSetRows } from './export';
+import { targetsLookup, type MuscleTargets } from './muscles';
 import type { Session, Settings } from './types';
 
 export type SyncOutcome =
@@ -49,9 +50,13 @@ export async function testConnection(settings: Pick<Settings, 'syncUrl' | 'syncT
   return 'Connected';
 }
 
-async function syncOne(settings: Settings, session: Session): Promise<void> {
-  const rows = sessionToRows(session);
-  const r = await postToScript(settings, { sessionId: session.id, rows });
+async function syncOne(settings: Settings, session: Session, targets: (name: string) => MuscleTargets): Promise<void> {
+  const r = await postToScript(settings, {
+    sessionId: session.id,
+    rows: sessionToRows(session), // "Log" tab, one row per exercise
+    sets: sessionToSetRows(session, targets), // "Sets" tab, one row per set
+    session: sessionSummaryRow(session), // "Sessions" tab
+  });
   if (!r.ok) throw new Error(r.error ?? 'Rejected by the script');
   // Only now is the session marked as synced. Any failure above leaves it queued.
   await db.sessions.update(session.id, { synced: 1, syncedAt: Date.now(), lastSyncError: undefined });
@@ -71,12 +76,13 @@ async function run(): Promise<SyncOutcome> {
   const pending = await pendingSessions();
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline', pending: pending.length };
 
+  const targets = targetsLookup(await loadPlan());
   let synced = 0;
   let failed = 0;
   let error: string | undefined;
   for (const s of pending) {
     try {
-      await syncOne(settings, s);
+      await syncOne(settings, s, targets);
       synced++;
     } catch (e) {
       failed++;

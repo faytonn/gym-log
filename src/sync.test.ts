@@ -49,6 +49,10 @@ describe('syncPending', () => {
     expect(body.token).toBe('secret');
     expect(body.sessionId).toBe('a');
     expect(body.rows[0][1]).toBe('Lat pulldown');
+    expect(body.sets).toHaveLength(1);
+    expect(body.sets[0].slice(3, 8)).toEqual(['Lat pulldown', 'weight', 1, 42, 12]);
+    expect(body.sets[0][9]).toBe('Lats');
+    expect(body.session[6]).toBe(1);
   });
 
   it('keeps sessions queued when the network fails', async () => {

@@ -75,18 +75,30 @@ On iOS, a browser tab and the installed app have separate storage. Log from the 
 
 ## Google Sheets sync
 
-Sync is optional. It appends one row per exercise to a sheet tab named `Log` with these columns:
+Sync is optional. It turns a Google Sheet into a training log. The script writes these tabs:
 
-`Date | Exercise | Weight (kg) | Set 1 | Set 2 | Set 3 | Set 4 | Reps left in tank | Notes`
+| Tab | Contents |
+| --- | --- |
+| `Log` | One row per exercise: `Date, Exercise, Weight (kg), Set 1, Set 2, Set 3, Set 4, Reps left in tank, Notes` |
+| `Sets` | One row per set, with the exercise type and its primary and secondary muscles. This is the raw data for the tabs below. |
+| `Sessions` | One row per workout: start time, duration, exercises, sets, volume |
+| `Dashboard` | Totals, hard sets per muscle (this week, last week, 4-week average), latest records |
+| `Progress` | One row per exercise: first and latest best set, best weight, estimated 1RM, change in percent, trend sparkline |
+| `Weekly` | One row per week: workouts, sets, volume, weighted sets per muscle |
+| `PRs` | Every personal record: weight, reps at a weight, estimated 1RM |
+
+`Dashboard`, `Progress`, `Weekly` and `PRs` are rebuilt from `Sets` after every sync, so edits made by hand in those four tabs are overwritten. The estimated 1RM uses the Epley formula. The script creates every tab except `Log`.
 
 Setup:
 
-1. Create a Google Sheet with a tab named `Log` and the header row above.
+1. Create a Google Sheet with a tab named `Log` and the header row from the table above.
 2. Open **Extensions → Apps Script** and replace the contents of `Code.gs` with [`apps-script/Code.gs`](apps-script/Code.gs).
-3. In **Project Settings → Script Properties**, add a property named `SYNC_TOKEN` with a long random value.
-4. Choose **Deploy → New deployment**, type **Web app**, with **Execute as: Me** and **Who has access: Anyone**. Authorize the script when asked.
+3. Select the function `setup` in the toolbar and click **Run**. Authorize the script when asked. It creates the tabs and a sync token, and prints the token in the execution log. To choose your own token instead, add a script property named `SYNC_TOKEN` under **Project Settings → Script Properties** first.
+4. Choose **Deploy → New deployment**, type **Web app**, with **Execute as: Me** and **Who has access: Anyone**.
 5. Copy the web app URL (it ends in `/exec`).
 6. In the app, open **Settings → Google Sheets sync**, paste the URL and the token, and tap **Test connection**.
+
+After a reload, the sheet has a **Gym Log** menu with **Rebuild summary tabs** and **Show sync token**.
 
 How it behaves:
 

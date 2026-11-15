@@ -86,18 +86,18 @@ describe('planVolume: default plan', () => {
     expect(v['side-delts']).toBe(3 + 2 + 3 + 3 + 1.5 + 1.5);
   });
 
-  it('rear delts: both fly days plus half sets from pulldown and rows', () => {
-    // Rear delt fly 3 + 2, lat pulldown 4 × 0.5, cable row 3 × 0.5, chest-supported row 3 × 0.5
-    expect(v['rear-delts']).toBe(5 + 2 + 1.5 + 1.5);
+  it('rear delts: both fly days, face pull, plus half sets from pulldown and rows', () => {
+    // Rear delt fly 3 + 3, face pull 3, lat pulldown 4 × 0.5, wide-grip row 3 × 0.5, chest-supported row 3 × 0.5
+    expect(v['rear-delts']).toBe(6 + 3 + 2 + 1.5 + 1.5);
   });
 
   it('front delts', () => {
-    // DB press 3, machine press 3, incline press 3 × 0.5, pec deck 3 × 0.5
-    expect(v['front-delts']).toBe(6 + 1.5 + 1.5);
+    // DB press 3, machine press 3, incline press 3 × 0.5, pec deck 3 × 0.5, low-to-high fly 3 × 0.5
+    expect(v['front-delts']).toBe(6 + 1.5 + 1.5 + 1.5);
   });
 
-  it('hamstrings: RDL, leg curl on two days, half sets from hip thrust', () => {
-    expect(v.hamstrings).toBe(3 + 2 + 3 + 1.5);
+  it('hamstrings: RDL, leg curl on two days, back extension, half sets from hip thrust', () => {
+    expect(v.hamstrings).toBe(3 + 2 + 3 + 2 + 1.5);
   });
 
   it('every exercise in the default plan has a primary muscle', () => {
