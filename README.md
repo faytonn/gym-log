@@ -1,133 +1,119 @@
 # Gym Log
 
-A mobile-first PWA for logging gym workouts on an iPhone. It works offline, keeps all data on the phone (IndexedDB), and can sync finished workouts to your own Google Sheet through a Google Apps Script web app. There is no login, no account and no backend apart from that script.
+An offline-first workout logger that runs as an installable web app. It tracks sets with double progression, shows which muscles each exercise trains, and can back up to a Google Sheet you own. There is no account and no server: data lives in the browser's IndexedDB.
 
-- **Home:** one big button per training day. The next day in your rotation is highlighted.
-- **Workout:** each exercise shows its sets × rep range, form note, what you did last time, and a double-progression hint. Weight and reps use big −/+ steppers that are prefilled, so logging a set is usually one tap. You can tap a number to type an exact value. A "reps left in tank" picker (0–5) is on each card.
-- **Rest timer:** starts when you save a set. Defaults are 2:30 for compound lifts and 1:15 for isolation lifts, and each exercise can override them. It beeps when rest is over (see the iPhone notes below).
-- **Crash-safe:** every tap is saved to IndexedDB at once. Closing the app or locking the phone mid-workout loses nothing, and the app reopens on the workout.
-- **History:** past sessions, plus per-exercise charts of working weight and best set over time. "Download CSV" exports a backup.
-- **Settings:** add, remove, reorder and edit exercises and days. Set rest times and Google Sheets sync.
+**Live app:** https://faytonn.github.io/gym-log/
 
-## Progression logic (double progression)
+## Features
 
-For each exercise the app looks at your most recent logged session of that exercise on any day. History is shared by exercise name, so "Lateral raise" on Mon, Tue and Sat is one history and "Leg curl" is shared between Tue and Fri.
+- **Training days:** one button per day of the plan, with the next day in the rotation highlighted.
+- **Fast set logging:** weight is typed on the numeric keypad and reps are picked by swiping a number strip. Both are prefilled from the previous session, so a repeat set is one tap.
+- **Double progression hints:** each exercise shows the last session and what to aim for next (see below).
+- **Rest timer:** starts when a set is saved, with separate defaults for compound and isolation lifts and an optional override per exercise.
+- **Crash-safe sessions:** every change is written to IndexedDB immediately, so a workout survives the app closing or the phone locking.
+- **Muscle maps:** a front and back body diagram per exercise, with primary and secondary muscles.
+- **Weekly volume:** hard sets per muscle for the current week, planned and logged, as a heatmap and a sorted table.
+- **History:** past sessions, per-exercise charts of working weight and best set, and CSV export.
+- **Editable plan:** days and exercises can be added, removed, reordered and edited in Settings.
+- **Google Sheets sync (optional):** finished sessions are queued locally and sent to an Apps Script web app. A failed sync never loses data.
+
+## Progression logic
+
+For each exercise the app reads the most recent session that included it. History is matched by exercise name, so an exercise that appears on several days has one shared history.
 
 | Last session | Hint |
 | --- | --- |
-| Never logged | **First session: find your weight** |
-| Lowest-rep set reached the top of the rep range | **Add weight (smallest jump)**, showing the target weight (last weight + the exercise's weight step) |
-| Otherwise | **Same weight, +1 rep**, showing which set to beat |
-| Assisted pull-up (load type "assist") at the top | **Less assist**, which lowers the number |
-| Hanging knee/leg raise (load type "bodyweight") at the top | **Make it harder (straighter legs)** |
+| Never logged | First session: find your weight |
+| Lowest-rep set reached the top of the rep range | Add weight (smallest jump) |
+| Any set below the top of the range | Same weight, +1 rep |
+| Load type "assist", top of the range reached | Less assist |
+| Load type "bodyweight", top of the range reached | Make it harder |
 
-The weight field is prefilled with last session's weight. When the hint suggests a new weight, a **Use X** button applies it with one tap. The logic is in `src/progression.ts`, with unit tests in `src/progression.test.ts`.
+The weight jump is set per exercise. The logic is in [`src/progression.ts`](src/progression.ts).
 
-## Run locally
+## Weekly volume
 
-Requires Node 20.19+ (Node 22 or 24 recommended).
+A set counts as 1 for each primary muscle and 0.5 for each secondary muscle. The week starts on Monday. The heatmap uses four bands: 0–4, 5–9, 10–15 and 16+ sets. The calculation is in [`src/muscles.ts`](src/muscles.ts).
+
+## Tech stack
+
+- Vite, React, TypeScript
+- Dexie (IndexedDB)
+- `vite-plugin-pwa` (service worker and web app manifest)
+- Vitest
+- Google Apps Script for the optional sync endpoint
+
+## Getting started
+
+Requires Node 20.19 or newer.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm test           # unit tests (progression, CSV/sheet rows, sync queue)
+npm run dev        # development server at http://localhost:5173
+npm test           # unit tests
 npm run build      # production build in dist/
-npm run preview    # serve the production build (service worker active)
+npm run preview    # serve the production build
 ```
 
-To try it on your phone over Wi-Fi, run `npm run dev -- --host` and open the printed network URL in Safari. Offline mode and "Add to Home Screen" need HTTPS, so use a deployed URL for the real install.
+The default training plan is defined in [`src/seed.ts`](src/seed.ts). It is only used on first run; after that the plan is edited in the app.
 
-## Deploy (free)
+## Deployment
 
-### Option A: GitHub Pages
+The app is a static site, so any static host works.
 
-1. Create a GitHub repository (for example `gym-log`) and push this project to its `main` branch:
-   ```bash
-   git remote add origin https://github.com/<you>/gym-log.git
-   git push -u origin main
-   ```
-2. On GitHub, open **Settings → Pages**. Under **Build and deployment → Source**, choose **GitHub Actions**.
-3. The workflow in `.github/workflows/deploy.yml` runs the tests, builds with the correct base path (`/<repo-name>/`) and publishes. Your app is then at `https://<you>.github.io/gym-log/`.
+**GitHub Pages:** the workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) tests, builds and publishes on every push to `main`. In the repository settings, set **Pages → Source** to **GitHub Actions**. The workflow sets the base path to the repository name.
 
-Every push to `main` redeploys. The installed app picks up the new version the next time you open it.
+**Vercel or Netlify:** import the repository with the build command `npm run build` and the output directory `dist`.
 
-### Option B: Vercel
+When the app is not served from the domain root, set the `BASE` environment variable at build time, for example `BASE=/gym-log/`.
 
-1. Push the project to GitHub (step 1 above).
-2. On [vercel.com](https://vercel.com), choose **Add New → Project**, import the repository and keep the detected settings (framework: Vite, build command `npm run build`, output directory `dist`).
-3. Deploy. Your app is at `https://<project>.vercel.app`.
+## Install on a phone
 
-## Add it to your iPhone home screen
+Open the deployed URL in Safari (iOS) or Chrome (Android) and choose **Add to Home Screen**. The app then opens full screen and works offline.
 
-1. Open the deployed URL in **Safari**.
-2. Tap the **Share** button, then **Add to Home Screen**, then **Add**.
-3. Start the app from the new icon. It opens full screen like a native app and works offline after the first load.
-
-> Note: data logged in a normal Safari tab and data in the home-screen app are stored separately on iOS. Install first, then always log from the icon.
+On iOS, a browser tab and the installed app have separate storage. Log from the installed app.
 
 ## Google Sheets sync
 
-The app sends finished workouts to a Google Apps Script web app bound to your **Workout Log** sheet. The script appends rows to the **Log** tab:
+Sync is optional. It appends one row per exercise to a sheet tab named `Log` with these columns:
 
 `Date | Exercise | Weight (kg) | Set 1 | Set 2 | Set 3 | Set 4 | Reps left in tank | Notes`
 
-One row is written per exercise. Notes holds the day (for example `Mon · Upper A`). It also records when the weight is an assist and when sets used different weights.
+Setup:
 
-### 1. Add the script to your sheet
+1. Create a Google Sheet with a tab named `Log` and the header row above.
+2. Open **Extensions → Apps Script** and replace the contents of `Code.gs` with [`apps-script/Code.gs`](apps-script/Code.gs).
+3. In **Project Settings → Script Properties**, add a property named `SYNC_TOKEN` with a long random value.
+4. Choose **Deploy → New deployment**, type **Web app**, with **Execute as: Me** and **Who has access: Anyone**. Authorize the script when asked.
+5. Copy the web app URL (it ends in `/exec`).
+6. In the app, open **Settings → Google Sheets sync**, paste the URL and the token, and tap **Test connection**.
 
-1. Open the **Workout Log** spreadsheet in Google Sheets. Check that it has a tab named exactly `Log` with the header row above.
-2. Go to **Extensions → Apps Script**. A script project bound to the sheet opens.
-3. Delete everything in `Code.gs` and paste the contents of [`apps-script/Code.gs`](apps-script/Code.gs). Click **Save** (disk icon).
+How it behaves:
 
-### 2. Set the secret token
+- A session is saved locally first and marked as synced only after the script confirms the write.
+- Unsynced sessions stay in a queue and retry when the app opens, when the device comes back online, and every minute while the app is open. Automatic sync can be turned off in Settings.
+- The script records each session ID in a hidden `_sync` tab, so a retry never writes duplicate rows.
+- Requests without the correct token are rejected. The token is stored only on the device and in the script's properties.
 
-1. Make up a long random string. You can generate one with `node -e "console.log(crypto.randomUUID())"` or use a password manager.
-2. In the Apps Script editor, click **Project Settings** (gear icon on the left).
-3. Scroll to **Script Properties** and click **Add script property**. Set **Property** to `SYNC_TOKEN` and **Value** to your random string. Click **Save script properties**.
+To update the script later, use **Deploy → Manage deployments → Edit → New version**. This keeps the same URL.
 
-### 3. Deploy it as a web app
+## Platform limits on iOS
 
-1. Click **Deploy → New deployment**.
-2. Click the gear next to **Select type** and choose **Web app**.
-3. Set **Execute as** to **Me** and **Who has access** to **Anyone**. The token is what protects it: requests without the right token are rejected.
-4. Click **Deploy**. When Google asks, click **Authorize access** and choose your account. If it shows "Google hasn't verified this app", click **Advanced → Go to (project name) (unsafe)**, then **Allow**. This warning appears because it is your own unpublished script.
-5. Copy the **Web app URL**. It looks like `https://script.google.com/macros/s/AKfy.../exec`.
-6. Optional check: open that URL in a browser. You should see `{"ok":true,"service":"gym-log-sync"}`.
-
-### 4. Connect the app
-
-1. In the app, open **Settings → Google Sheets sync**.
-2. Paste the web app URL and the token.
-3. Tap **Test connection**. It should say "✓ Connected".
-
-### How sync behaves
-
-- A finished workout is **saved on the phone first**, then synced. Sync failures never delete anything.
-- Unsynced workouts wait in a queue, shown as "Queued" in History and as a counter on Home. With **Sync automatically when online** on, they retry when the app opens, when the phone comes back online, and every minute while the app is open. With it off, they sync only when you tap **Sync now**.
-- A workout is marked synced only after the script confirms it wrote the rows. The script records each workout ID in a hidden `_sync` tab. If a retry sends the same workout again, it does not duplicate rows.
-- **Download CSV** in History exports everything in the same columns as the sheet. On iPhone it opens the share sheet, where you can choose **Save to Files**.
-
-### Updating the script later
-
-Use **Deploy → Manage deployments**, click the pencil, set **Version** to **New version**, then click **Deploy**. This keeps the same URL. A **New deployment** would create a new URL that you would have to paste into the app again.
-
-## iPhone notes and limits
-
-- **Beep:** iOS allows sound only after a tap, so the app unlocks audio when you tap **Save set**. The silent switch can mute it.
-- **Vibration:** iOS Safari does not support web vibration, so the app vibrates only on Android.
-- **Screen lock:** iOS pauses web apps while the screen is locked, so no beep plays while it is locked. The timer uses an absolute end time, so it shows the right time when you unlock. Keep **Keep screen on during workout** enabled (it uses the Wake Lock API, iOS 18.4+ for home-screen apps) if you want the beep.
-- **Storage:** the app asks the browser for persistent storage. iOS does not apply its 7-day storage cleanup to home-screen apps. For safety, keep Sheets sync on or export a CSV now and then.
+- Sound plays only after a user gesture, so the timer beep is unlocked when a set is saved. The silent switch mutes it.
+- iOS Safari has no vibration API.
+- Web apps are suspended while the screen is locked, so the beep cannot play then. The timer uses an absolute end time and is correct again on unlock. The app can keep the screen awake during a workout (Wake Lock API).
 
 ## Project layout
 
 ```
-apps-script/Code.gs        Google Apps Script endpoint (doPost / doGet)
-scripts/make-icons.mjs     generates the PWA and iOS icons (npm run icons)
-src/seed.ts                default training plan (editable in Settings)
-src/progression.ts         double progression, history lookup, day rotation
-src/export.ts              sheet rows and CSV
-src/sync.ts                sync queue to Apps Script
-src/db.ts                  IndexedDB (Dexie): sessions, plan, settings, workout in progress
-src/screens/               Home, Workout, Finished, History, Settings
-src/components/            ExerciseCard, Stepper, RestTimer, LineChart, TextField
+apps-script/Code.gs      Apps Script sync endpoint
+scripts/make-icons.mjs   icon generator (npm run icons)
+src/seed.ts              default training plan
+src/progression.ts       double progression, history lookup, day rotation
+src/muscles.ts           muscle list, default mapping, weekly volume
+src/export.ts            sheet rows and CSV
+src/sync.ts              sync queue
+src/db.ts                IndexedDB storage
+src/screens/             Home, Workout, Finished, History, Muscles, Settings
+src/components/          ExerciseCard, BodyMap, RepWheel, WeightField, RestTimer, LineChart
 ```
