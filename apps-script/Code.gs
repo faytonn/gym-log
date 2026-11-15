@@ -30,6 +30,18 @@ var SESSIONS_HEADER = ['Date', 'Session ID', 'Day', 'Start', 'Duration (min)', '
 var SYNC_HEADER = ['Session ID', 'Synced at', 'Rows'];
 var TREND_SESSIONS = 8;
 
+// Time zone of the spreadsheet. Date cells are written and read in it, so a date never shifts
+// by a day when the script project and the spreadsheet are set to different time zones.
+var TZ_ = null;
+
+function useTimeZone_(ss) {
+  try {
+    TZ_ = ss.getSpreadsheetTimeZone() || null;
+  } catch (err) {
+    TZ_ = null;
+  }
+}
+
 // ---------------------------------------------------------------- web app
 
 function doPost(e) {
@@ -53,6 +65,7 @@ function doPost(e) {
     lock.waitLock(20000);
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      useTimeZone_(ss);
       var log = ss.getSheetByName(LOG_SHEET);
       if (!log) return json_({ ok: false, error: 'No tab named "' + LOG_SHEET + '"' });
 
@@ -171,13 +184,14 @@ function appendRows_(sheet, rows, width) {
 function normalizeRow_(row, width) {
   var out = [];
   for (var i = 0; i < width; i++) out.push(row[i] === undefined || row[i] === null ? '' : row[i]);
-  // "2026-11-14" -> real date cell (local time, no timezone shift)
+  // "2026-11-14" -> a date cell for that day in the spreadsheet's time zone
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(out[0]));
-  if (m) out[0] = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (m) out[0] = TZ_ ? Utilities.parseDate(m[0], TZ_, 'yyyy-MM-dd') : new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return out;
 }
 
 function rebuildSummaries_(ss) {
+  useTimeZone_(ss);
   var setsSheet = ss.getSheetByName(SETS_SHEET);
   var last = setsSheet ? setsSheet.getLastRow() : 0;
   var rows = last >= 2 ? setsSheet.getRange(2, 1, last - 1, SETS_HEADER.length).getValues() : [];
@@ -192,7 +206,8 @@ function rebuildSummaries_(ss) {
   for (var i = 0; i < s.trendCounts.length; i++) {
     if (s.trendCounts[i] < 2) continue;
     var row = i + 2;
-    var range = columnLetter_(s.trendFirstColumn) + row + ':' + columnLetter_(s.trendFirstColumn + s.trendCounts[i] - 1) + row;
+    var lastColumn = s.trendFirstColumn + TREND_SESSIONS - 1;
+    var range = columnLetter_(lastColumn - s.trendCounts[i] + 1) + row + ':' + columnLetter_(lastColumn) + row;
     progress.getRange(row, s.trendColumn).setFormula('=SPARKLINE(' + range + ')');
   }
 }
@@ -225,26 +240,30 @@ function columnLetter_(n) {
 
 // ---------------------------------------------------------------- summaries (pure functions)
 
+/** "YYYY-MM-DD" of a date cell or a moment, as a calendar day in the spreadsheet's time zone. */
 function dateKey_(v) {
-  if (Object.prototype.toString.call(v) === '[object Date]') {
-    var p = function (n) {
-      return (n < 10 ? '0' : '') + n;
-    };
-    return v.getFullYear() + '-' + p(v.getMonth() + 1) + '-' + p(v.getDate());
-  }
+  if (Object.prototype.toString.call(v) === '[object Date]') return TZ_ ? Utilities.formatDate(v, TZ_, 'yyyy-MM-dd') : ymd_(v);
   return String(v).slice(0, 10);
+}
+
+/** "YYYY-MM-DD" of a date built with new Date(y, m, d). Only for calendar arithmetic below. */
+function ymd_(d) {
+  var p = function (n) {
+    return (n < 10 ? '0' : '') + n;
+  };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
 /** Monday of the week that contains the given "YYYY-MM-DD". */
 function weekStart_(key) {
   var d = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return dateKey_(d);
+  return ymd_(d);
 }
 
 function addDays_(key, days) {
   var d = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)) + days);
-  return dateKey_(d);
+  return ymd_(d);
 }
 
 function round1_(n) {
@@ -450,7 +469,7 @@ function summarize_(rows, now) {
       if (sj.e1rm !== null) best1rm = Math.max(best1rm, sj.e1rm);
     }
     var weighted = ex.type === 'weight';
-    var change = first.score > 0 ? round1_(((lastS.score - first.score) / first.score) * 100) : '';
+    var change = ex.sessions.length > 1 && first.score > 0 ? round1_(((lastS.score - first.score) / first.score) * 100) : '';
     var row = [
       ex.name,
       ex.type,
@@ -467,6 +486,7 @@ function summarize_(rows, now) {
       '',
     ];
     var recent = ex.sessions.slice(-TREND_SESSIONS);
+    for (j = recent.length; j < TREND_SESSIONS; j++) row.push(''); // newest session always under "Latest"
     for (j = 0; j < recent.length; j++) row.push(round1_(recent[j].score));
     trendCounts.push(recent.length);
     progress.push(row);

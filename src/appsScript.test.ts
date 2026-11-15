@@ -52,6 +52,23 @@ class FakeSheet {
   }
 }
 
+/** Calendar day of `d` in time zone `tz`, as "YYYY-MM-DD". */
+const dayIn = (d: Date, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+
+/** Midnight of "YYYY-MM-DD" in time zone `tz`. */
+function midnightIn(key: string, tz: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  const guess = Date.UTC(y, m - 1, d);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+    .formatToParts(new Date(guess))
+    .reduce<Record<string, number>>((o, p) => (p.type === 'literal' ? o : { ...o, [p.type]: Number(p.value) }), {});
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  return new Date(guess - (asUtc - guess));
+}
+
+// The spreadsheet in the bug report was set to US Pacific; the script ran in another zone.
+const SHEET_TZ = 'America/Los_Angeles';
+
 function makeEnv() {
   const sheets = new Map<string, FakeSheet>();
   const log = new FakeSheet('Log');
@@ -59,6 +76,7 @@ function makeEnv() {
   sheets.set('Log', log);
   const props = new Map<string, string>([['SYNC_TOKEN', 'secret']]);
   const ss = {
+    getSpreadsheetTimeZone: () => SHEET_TZ,
     getSheetByName: (n: string) => sheets.get(n) ?? null,
     insertSheet: (n: string) => {
       const s = new FakeSheet(n);
@@ -72,7 +90,11 @@ function makeEnv() {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k: string) => props.get(k) ?? null, setProperty: (k: string, v: string) => props.set(k, v) }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (text: string) => ({ text, setMimeType() { return this; } }) },
-    Utilities: { getUuid: () => `0000-${++uuid}` },
+    Utilities: {
+      getUuid: () => `0000-${++uuid}`,
+      parseDate: (s: string, tz: string) => midnightIn(s, tz),
+      formatDate: (d: Date, tz: string) => dayIn(d, tz),
+    },
     Logger: { log() {} },
   });
   vm.runInContext(readFileSync(resolve(__dirname, '../apps-script/Code.gs'), 'utf8'), ctx);
@@ -81,6 +103,7 @@ function makeEnv() {
 }
 
 const targets = (name: string) => defaultMuscles(name);
+const round1 = (n: number) => Math.round(n * 10) / 10;
 const DAY = 86_400_000;
 
 function workout(id: string, finishedAt: number, entries: [name: string, kind: LoadKind, weight: number, reps: number[]][]): Session {
@@ -124,7 +147,7 @@ describe('Apps Script doPost', () => {
     expect(log).toHaveLength(2);
     expect(log[1]).toHaveLength(9);
     expect(Object.prototype.toString.call(log[1][0])).toBe('[object Date]');
-    expect((log[1][0] as Date).getDate()).toBe(14);
+    expect(dayIn(log[1][0] as Date, SHEET_TZ)).toBe('2026-11-14');
     expect(log[1].slice(1)).toEqual(['Lateral raise', 5, 15, 14, 12, '', 2, 'Sat · Shoulders & arms']);
 
     const sets = env.sheets.get('Sets')!.rows;
@@ -176,7 +199,9 @@ describe('Apps Script doPost', () => {
     expect(lateral[9]).toBe(8.4); // 6 × (1 + 12/30)
     expect(lateral[11]).toBe(20);
     const rowNo = progress.rows.indexOf(lateral) + 1;
-    expect(progress.formulas.get(`${rowNo},13`)).toBe(`=SPARKLINE(N${rowNo}:P${rowNo})`);
+    expect(progress.formulas.get(`${rowNo},13`)).toBe(`=SPARKLINE(S${rowNo}:U${rowNo})`);
+    expect(lateral.slice(13, 18)).toEqual(['', '', '', '', '']);
+    expect(lateral[20]).toBe(round1(6 * (1 + 12 / 30)));
     const pullup = progress.rows.find((x) => x[0] === 'Assisted pull-up')!;
     expect(pullup[7]).toBe(32.5); // least assist
     expect(pullup[8]).toBe(''); // no 1RM estimate for assisted work
@@ -203,6 +228,29 @@ describe('Apps Script doPost', () => {
     expect(value('Workouts this week')).toBe(1);
     const side = dash.find((x) => x[0] === 'Side delts')!;
     expect(side.slice(1, 3)).toEqual([3, 3]); // this week, last week
+  });
+
+  it('writes and reads dates as calendar days of the spreadsheet time zone', () => {
+    // Finished at 03:41 on 15 Nov in UTC+3, which is still 14 Nov in US Pacific. The phone's
+    // own date (15 Nov) must be what every tab shows.
+    const s = workout('late', Date.UTC(2026, 10, 15, 0, 41), [['Lateral raise', 'weight', 5, [12]]]);
+    const p = { ...payload(s), rows: [['2026-11-15', ...sessionToRows(s)[0].slice(1)]], sets: sessionToSetRows(s, targets).map((r) => ['2026-11-15', ...r.slice(1)]), session: ['2026-11-15', ...sessionSummaryRow(s).slice(1)] };
+    env.post(p);
+    expect(dayIn(env.sheets.get('Log')!.rows[1][0] as Date, SHEET_TZ)).toBe('2026-11-15');
+    expect(dayIn(env.sheets.get('Sets')!.rows[1][0] as Date, SHEET_TZ)).toBe('2026-11-15');
+    expect(dayIn(env.sheets.get('Sessions')!.rows[1][0] as Date, SHEET_TZ)).toBe('2026-11-15');
+    const row = env.sheets.get('Progress')!.rows[1];
+    expect(row.slice(3, 5)).toEqual(['2026-11-15', '2026-11-15']);
+    expect(env.sheets.get('Weekly')!.rows[1][0]).toBe('2026-11-09');
+  });
+
+  it('puts a single session under "Latest" with no change figure', () => {
+    env.post(payload(workout('one', Date.now(), [['Lateral raise', 'weight', 5, [12]]])));
+    const progress = env.sheets.get('Progress')!.rows;
+    expect(progress[0][20]).toBe('Latest');
+    expect(progress[1][11]).toBe(''); // Change %
+    expect(progress[1].slice(13, 20)).toEqual(['', '', '', '', '', '', '']);
+    expect(progress[1][20]).toBe(7);
   });
 
   it('setup creates a token once and the tabs', () => {
