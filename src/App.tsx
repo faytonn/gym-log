@@ -4,13 +4,14 @@ import { clearActive, commitSession, db, loadActive, loadPlan, requestPersistent
 import { Finished } from './screens/Finished';
 import { History } from './screens/History';
 import { Home } from './screens/Home';
+import { Muscles } from './screens/Muscles';
 import { SettingsScreen } from './screens/Settings';
 import { Workout } from './screens/Workout';
 import { syncPending, type SyncOutcome } from './sync';
 import { DEFAULT_SETTINGS, type ActiveSession, type Plan, type Settings } from './types';
 import { countSets, newActive, toSession } from './workout';
 
-type Route = { name: 'home' } | { name: 'workout' } | { name: 'history' } | { name: 'settings' } | { name: 'finished'; sessionId: string };
+type Route = { name: 'home' } | { name: 'workout' } | { name: 'history' } | { name: 'muscles' } | { name: 'settings' } | { name: 'finished'; sessionId: string };
 
 const RETRY_MS = 60_000;
 
@@ -168,6 +169,8 @@ export function App() {
       );
     case 'history':
       return <History sessions={sessions} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
+    case 'muscles':
+      return <Muscles plan={plan} sessions={sessions} onBack={home} />;
     case 'settings':
       return <SettingsScreen plan={plan} settings={settings} pending={pending} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
     default:
@@ -181,6 +184,7 @@ export function App() {
           onStart={startDay}
           onResume={() => setRoute({ name: 'workout' })}
           onHistory={() => setRoute({ name: 'history' })}
+          onMuscles={() => setRoute({ name: 'muscles' })}
           onSettings={() => setRoute({ name: 'settings' })}
           onSync={runSync}
         />

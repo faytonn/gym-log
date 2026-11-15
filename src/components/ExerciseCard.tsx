@@ -1,7 +1,11 @@
 import { fmtKg, nextHint, workingWeight, type LastEntry } from '../progression';
+import { useState } from 'react';
 import type { ActiveEntry, PlanExercise } from '../types';
 import { fmtDate, fmtDuration } from '../workout';
-import { Stepper } from './Stepper';
+import { MUSCLE_LABEL, type Muscle } from '../muscles';
+import { BodyMap, type MapLevel } from './BodyMap';
+import { RepWheel } from './RepWheel';
+import { WeightField } from './WeightField';
 
 interface Props {
   index: number;
@@ -17,6 +21,65 @@ interface Props {
 }
 
 const RIR = [0, 1, 2, 3, 4, 5];
+const MAP_KEY = 'gym-log:show-muscle-map';
+
+function readMapPref(): boolean {
+  try {
+    return localStorage.getItem(MAP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function Muscles({ ex }: { ex: PlanExercise }) {
+  const [open, setOpen] = useState(readMapPref);
+  const primary = ex.primaryMuscles ?? [];
+  const secondary = (ex.secondaryMuscles ?? []).filter((m) => !primary.includes(m));
+  if (primary.length + secondary.length === 0) return null;
+
+  const levels: Partial<Record<Muscle, MapLevel>> = {};
+  for (const m of secondary) levels[m] = 'secondary';
+  for (const m of primary) levels[m] = 'primary';
+  const names = (list: Muscle[]) => list.map((m) => MUSCLE_LABEL[m]).join(', ');
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(MAP_KEY, next ? '1' : '0');
+    } catch {
+      /* preference only */
+    }
+  };
+
+  return (
+    <div className="muscles">
+      <button type="button" className="muscles-head" onClick={toggle} aria-expanded={open}>
+        <span className="muscles-text">
+          <span className="muted">Muscles</span>
+          <span>
+            <strong>{names(primary)}</strong>
+            {secondary.length > 0 && <span className="muted"> + {names(secondary)}</span>}
+          </span>
+        </span>
+        <span className="chev" aria-hidden="true">
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+      {open && (
+        <BodyMap
+          compact
+          levels={levels}
+          detail={(m) => (primary.includes(m) ? 'primary' : secondary.includes(m) ? 'secondary' : 'not targeted')}
+          caption={
+            <span className="map-key">
+              <span className="key-swatch bm-primary" /> Primary <span className="key-swatch bm-secondary" /> Secondary
+            </span>
+          }
+        />
+      )}
+    </div>
+  );
+}
 
 function weightLabel(ex: PlanExercise): string {
   if (ex.kind === 'assist') return 'Assist';
@@ -48,6 +111,7 @@ export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, on
       {expanded && (
         <div className="ex-body">
           {ex.note && <p className="ex-note">{ex.note}</p>}
+          <Muscles ex={ex} />
 
           <div className="ex-last">
             <span className="muted">Last time</span>
@@ -92,9 +156,9 @@ export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, on
             </div>
           )}
 
-          <div className="steppers">
-            <Stepper label={weightLabel(ex)} unit="kg" decimal value={entry.weight} step={ex.increment} onChange={(weight) => onChange({ weight })} />
-            <Stepper label="Reps" value={entry.reps} step={1} onChange={(reps) => onChange({ reps })} />
+          <div className="entry-row">
+            <WeightField label={weightLabel(ex)} value={entry.weight} onChange={(weight) => onChange({ weight })} />
+            <RepWheel label="Reps · swipe" value={entry.reps} max={Math.max(30, ex.repMax + 10)} rangeMin={ex.repMin} rangeMax={ex.repMax} onChange={(reps) => onChange({ reps })} />
           </div>
 
           <button type="button" className={`btn btn-save ${done ? 'btn-secondary' : ''}`} onClick={onSaveSet}>

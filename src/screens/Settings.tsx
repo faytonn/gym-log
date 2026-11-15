@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Stepper } from '../components/Stepper';
 import { TextField } from '../components/TextField';
 import { savePlan, saveSettings } from '../db';
+import { MUSCLES, MUSCLE_LABEL, defaultMuscles, type Muscle } from '../muscles';
 import { seedPlan, slug } from '../seed';
 import { testConnection } from '../sync';
 import type { LoadKind, Plan, PlanDay, PlanExercise, RestType, Settings } from '../types';
@@ -263,6 +264,13 @@ function ExerciseEditor({ initial, onSave, onCancel }: { initial: PlanExercise; 
   const [restText, setRestText] = useState(initial.restSeconds === null ? '' : String(initial.restSeconds));
   const p = (patch: Partial<PlanExercise>) => setEx({ ...ex, ...patch });
 
+  const cycleMuscle = (mu: Muscle) => {
+    const without = (list: Muscle[]) => list.filter((x) => x !== mu);
+    if (ex.primaryMuscles.includes(mu)) p({ primaryMuscles: without(ex.primaryMuscles), secondaryMuscles: [...ex.secondaryMuscles, mu] });
+    else if (ex.secondaryMuscles.includes(mu)) p({ secondaryMuscles: without(ex.secondaryMuscles) });
+    else p({ primaryMuscles: [...ex.primaryMuscles, mu] });
+  };
+
   const save = () => {
     const name = ex.name.trim();
     if (!name) return alert('Give the exercise a name.');
@@ -317,6 +325,25 @@ function ExerciseEditor({ initial, onSave, onCancel }: { initial: PlanExercise; 
           <span className="muted">Rest override in seconds (blank = use rest type)</span>
           <input inputMode="numeric" value={restText} onChange={(e) => setRestText(e.target.value)} />
         </label>
+        <div className="field">
+          <span className="muted">Muscles: tap to cycle off → primary → secondary</span>
+          <div className="muscle-pick">
+            {MUSCLES.map((mu) => {
+              const state = ex.primaryMuscles.includes(mu) ? 'primary' : ex.secondaryMuscles.includes(mu) ? 'secondary' : 'off';
+              return (
+                <button type="button" key={mu} className={`pill muscle-${state}`} aria-label={`${MUSCLE_LABEL[mu]}: ${state}`} onClick={() => cycleMuscle(mu)}>
+                  {MUSCLE_LABEL[mu]}
+                  {state !== 'off' && <span className="muscle-tag">{state === 'primary' ? '1' : '½'}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {ex.primaryMuscles.length + ex.secondaryMuscles.length === 0 && defaultMuscles(ex.name).primaryMuscles.length > 0 && (
+            <button type="button" className="btn btn-small btn-secondary" onClick={() => p(defaultMuscles(ex.name))}>
+              Use suggested muscles for this name
+            </button>
+          )}
+        </div>
         <label className="field">
           <span className="muted">Form note</span>
           <textarea rows={3} value={ex.note} onChange={(e) => p({ note: e.target.value })} />

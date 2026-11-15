@@ -9,6 +9,14 @@
   --accent: #b8f34a;
   --accent-ink: #0e0f12;
   --chart: #72a32a;
+  /* body map: primary/secondary on exercise cards, three heat steps for weekly volume */
+  --bm-rest: #2a2e36;
+  --bm-base: #1f2228;
+  --bm-primary: var(--accent);
+  --bm-secondary: color-mix(in srgb, var(--accent) 38%, var(--bm-rest));
+  --bm-light: color-mix(in srgb, var(--accent) 30%, var(--bm-rest));
+  --bm-medium: color-mix(in srgb, var(--accent) 62%, var(--bm-rest));
+  --bm-strong: var(--accent);
   --warn: #f2b84b;
   --danger: #ff6b6b;
   --ok: #7ad97a;
@@ -278,7 +286,7 @@ h2 {
 }
 .home-nav {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
   margin-top: auto;
 }
@@ -880,4 +888,294 @@ h2 {
   background: var(--surface);
   border-radius: 20px 20px 0 0;
   padding: 18px 16px calc(var(--safe-bottom) + 18px);
+}
+
+/* ---------- weight field + rep wheel ---------- */
+.entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+.weight-field,
+.wheel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.weight-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 0 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.weight-box:focus-within {
+  border-color: var(--accent);
+}
+.weight-box input {
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 0;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.wheel-frame {
+  position: relative;
+  height: 72px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.wheel-strip {
+  display: flex;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-inline: calc(50% - 26px);
+  outline: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+.wheel-strip::-webkit-scrollbar {
+  display: none;
+}
+.wheel-item {
+  flex: none;
+  width: 52px;
+  height: 100%;
+  scroll-snap-align: center;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.55;
+}
+.wheel-item.in-range {
+  opacity: 1;
+}
+.wheel-item.on {
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 700;
+  opacity: 1;
+}
+.wheel-marker {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 22px;
+  height: 3px;
+  margin-left: -11px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* ---------- body map ---------- */
+.muscles-head {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.muscles-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  min-width: 0;
+}
+.muscles-text .muted:first-child {
+  font-size: 13px;
+}
+.chev {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 6px;
+}
+.bodymap-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 340px;
+  margin: 0 auto;
+}
+.bodymap-compact .bodymap-figures {
+  max-width: 220px;
+}
+.bodymap figure {
+  margin: 0;
+  text-align: center;
+}
+.bodymap figcaption {
+  font-size: 12px;
+  color: var(--muted);
+}
+.bodymap svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.bodymap-readout {
+  margin: 6px 0 0;
+  min-height: 24px;
+  text-align: center;
+  font-size: 15px;
+}
+.bm-base {
+  fill: var(--bm-base);
+}
+.bm-muscle {
+  cursor: pointer;
+  outline: none;
+  stroke: var(--surface);
+  stroke-width: 0.6;
+  fill: var(--bm-rest);
+}
+.bm-muscle.bm-primary {
+  fill: var(--bm-primary);
+}
+.bm-muscle.bm-secondary {
+  fill: var(--bm-secondary);
+}
+.bm-muscle.bm-light {
+  fill: var(--bm-light);
+}
+.bm-muscle.bm-medium {
+  fill: var(--bm-medium);
+}
+.bm-muscle.bm-strong {
+  fill: var(--bm-strong);
+}
+.bm-muscle.bm-selected,
+.bm-muscle:focus-visible {
+  stroke: var(--text);
+  stroke-width: 1.4;
+}
+.key-swatch,
+.vol-fill {
+  background: var(--bm-rest);
+}
+.key-swatch.bm-primary {
+  background: var(--bm-primary);
+}
+.key-swatch.bm-secondary {
+  background: var(--bm-secondary);
+}
+.key-swatch.bm-light,
+.vol-fill.bm-light {
+  background: var(--bm-light);
+}
+.key-swatch.bm-medium,
+.vol-fill.bm-medium {
+  background: var(--bm-medium);
+}
+.key-swatch.bm-strong,
+.vol-fill.bm-strong {
+  background: var(--bm-strong);
+}
+.map-key {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.map-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.key-swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.volume-table .num {
+  text-align: right;
+  width: 64px;
+  color: var(--muted);
+}
+.volume-table .num.strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.vol-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vol-bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.vol-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+.muscle-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.muscle-pick .pill {
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pill.muscle-primary {
+  background: var(--bm-primary);
+  color: var(--accent-ink);
+  border-color: var(--bm-primary);
+  font-weight: 700;
+}
+.pill.muscle-secondary {
+  background: var(--bm-secondary);
+  border-color: var(--bm-secondary);
+}
+.muscle-tag {
+  font-size: 12px;
+  font-weight: 800;
+}
+.vol-fill.bm-none {
+  background: #4a505c;
+}
+.key-swatch.bm-none {
+  box-shadow: inset 0 0 0 1px #4a505c;
 }

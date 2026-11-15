@@ -11,11 +11,12 @@ interface Props {
   onStart: (dayId: string) => void;
   onResume: () => void;
   onHistory: () => void;
+  onMuscles: () => void;
   onSettings: () => void;
   onSync: () => void;
 }
 
-export function Home({ plan, sessions, active, pending, syncLabel, onStart, onResume, onHistory, onSettings, onSync }: Props) {
+export function Home({ plan, sessions, active, pending, syncLabel, onStart, onResume, onHistory, onMuscles, onSettings, onSync }: Props) {
   const next = nextDayId(
     plan.days.map((d) => d.id),
     sessions,
@@ -64,6 +65,9 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
       <div className="home-nav">
         <button type="button" className="nav-btn" onClick={onHistory}>
           History
+        </button>
+        <button type="button" className="nav-btn" onClick={onMuscles}>
+          Muscles
         </button>
         <button type="button" className="nav-btn" onClick={onSettings}>
           Settings
