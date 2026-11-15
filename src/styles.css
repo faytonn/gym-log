@@ -1494,3 +1494,24 @@ p {
   color: var(--accent-ink);
   font-weight: 700;
 }
+
+/* ---------- demo ---------- */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.demo-banner strong {
+  color: var(--accent);
+  font: 600 12px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.demo-banner .btn {
+  flex: none;
+}

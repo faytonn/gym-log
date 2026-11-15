@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { seedDemo } from '../demo';
+import { DEMO } from '../mode';
 import { MUSCLE_LABEL, loggedVolume, planVolume, startOfWeek, type Muscle } from '../muscles';
 import { nextDayId } from '../progression';
 import { findRecords, weekSummary } from '../stats';
@@ -50,6 +52,17 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
 
   return (
     <div className="screen home">
+      {DEMO && (
+        <div className="demo-banner" role="note">
+          <span>
+            <strong>Demo</strong> with eight weeks of sample workouts. Anything you change stays in this browser, and nothing is synced.
+          </span>
+          <button type="button" className="btn btn-small btn-secondary" onClick={() => void seedDemo(true).then(() => location.reload())}>
+            Reset
+          </button>
+        </div>
+      )}
+
       <header className="home-head">
         <div>
           <span className="lab">

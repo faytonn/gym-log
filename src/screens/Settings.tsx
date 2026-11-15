@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Stepper } from '../components/Stepper';
 import { TextField } from '../components/TextField';
+import { DEMO } from '../mode';
 import { savePlan, saveSettings } from '../db';
 import { MUSCLES, MUSCLE_LABEL, defaultMuscles, type Muscle } from '../muscles';
 import { seedPlan, slug } from '../seed';
@@ -51,6 +52,10 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
       <div className="cards">
         <section className="card form">
           <h2>Google Sheets sync</h2>
+          {DEMO ? (
+            <p className="small muted">Sync is turned off in the demo. In your own copy of the app, this is where you connect a Google Sheet.</p>
+          ) : (
+            <>
           <label className="field">
             <span className="muted">Apps Script web app URL</span>
             <TextField
@@ -89,6 +94,8 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
           </div>
           {test && <p className="small">{test}</p>}
           {syncLabel && <p className="small muted">{syncLabel}</p>}
+            </>
+          )}
         </section>
 
         <section className="card form">

@@ -1,4 +1,5 @@
 import { db, loadPlan, loadSettings, pendingSessions } from './db';
+import { DEMO } from './mode';
 import { sessionSummaryRow, sessionToRows, sessionToSetRows } from './export';
 import { targetsLookup, type MuscleTargets } from './muscles';
 import type { Session, Settings } from './types';
@@ -45,6 +46,7 @@ export async function postToScript(settings: Pick<Settings, 'syncUrl' | 'syncTok
 }
 
 export async function testConnection(settings: Pick<Settings, 'syncUrl' | 'syncToken'>): Promise<string> {
+  if (DEMO) throw new Error('Sync is turned off in the demo');
   const r = await postToScript(settings, { ping: true });
   if (!r.ok) throw new Error(r.error ?? 'Rejected');
   return 'Connected';
@@ -71,6 +73,7 @@ export function syncPending(): Promise<SyncOutcome> {
 }
 
 async function run(): Promise<SyncOutcome> {
+  if (DEMO) return { status: 'not-configured' };
   const settings = await loadSettings();
   if (!settings.syncUrl || !settings.syncToken) return { status: 'not-configured' };
   const pending = await pendingSessions();

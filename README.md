@@ -4,6 +4,8 @@ An offline-first workout logger that runs as an installable web app. It tracks s
 
 **Live app:** https://faytonn.github.io/gym-log/
 
+**Demo with sample data:** https://faytonn.github.io/gym-log/?demo. It fills the app with eight weeks of generated workouts, keeps them in a separate local database, and has syncing turned off.
+
 ## Features
 
 - **Training days:** one button per day of the plan, with the next day in the rotation highlighted.

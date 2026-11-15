@@ -1,6 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearActive, commitSession, db, loadActive, loadPlan, requestPersistentStorage, saveActive } from './db';
+import { seedDemo } from './demo';
+import { DEMO } from './mode';
 import { Finished } from './screens/Finished';
 import { History } from './screens/History';
 import { Home } from './screens/Home';
@@ -39,11 +41,12 @@ export function App() {
   useEffect(() => {
     void (async () => {
       await loadPlan();
+      if (DEMO) await seedDemo();
       const a = await loadActive();
       setActive(a);
       if (a) setRoute({ name: 'workout' });
       setReady(true);
-      void requestPersistentStorage();
+      if (!DEMO) void requestPersistentStorage();
     })();
   }, []);
 

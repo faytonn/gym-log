@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { DEMO } from './mode';
 import { withMuscles } from './muscles';
 import { isSupersededDefault, seedPlan } from './seed';
 import { DEFAULT_SETTINGS, type ActiveSession, type Plan, type Session, type Settings } from './types';
@@ -13,7 +14,8 @@ class GymDB extends Dexie {
   kv!: Table<KV, string>;
 
   constructor() {
-    super('gym-log');
+    // The demo keeps its own database, so it can never touch real workouts.
+    super(DEMO ? 'gym-log-demo' : 'gym-log');
     this.version(1).stores({
       sessions: 'id, finishedAt, synced',
       kv: 'key',
