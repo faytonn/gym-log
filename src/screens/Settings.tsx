@@ -163,6 +163,8 @@ function PlanEditor({ plan }: { plan: Plan }) {
     kind: 'weight',
     increment: 2.5,
     note: '',
+    primaryMuscles: [],
+    secondaryMuscles: [],
   });
 
   const saveExercise = (ex: PlanExercise) => {

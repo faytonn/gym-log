@@ -1,3 +1,5 @@
+import type { Muscle } from './muscles';
+
 export type RestType = 'compound' | 'isolation';
 
 /** How the logged weight should be read. */
@@ -21,6 +23,8 @@ export interface PlanExercise {
   /** Smallest weight jump available for this exercise, in kg. Also the stepper step. */
   increment: number;
   note: string;
+  primaryMuscles: Muscle[];
+  secondaryMuscles: Muscle[];
 }
 
 export interface PlanDay {

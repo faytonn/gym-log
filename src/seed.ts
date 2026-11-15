@@ -1,3 +1,4 @@
+import { defaultMuscles } from './muscles';
 import type { LoadKind, Plan, PlanDay, PlanExercise, RestType } from './types';
 
 type Row = [
@@ -37,6 +38,7 @@ function day(label: string, name: string, rows: Row[]): PlanDay {
         kind: extra?.kind ?? 'weight',
         increment: extra?.increment ?? 2.5,
         note,
+        ...defaultMuscles(exName),
       }),
     ),
   };
