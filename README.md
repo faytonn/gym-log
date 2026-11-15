@@ -13,7 +13,8 @@ An offline-first workout logger that runs as an installable web app. It tracks s
 - **Crash-safe sessions:** every change is written to IndexedDB immediately, so a workout survives the app closing or the phone locking.
 - **Muscle maps:** a front and back body diagram per exercise, with primary and secondary muscles.
 - **Weekly volume:** hard sets per muscle for the current week, planned and logged, as a heatmap and a sorted table.
-- **History:** past sessions, per-exercise charts of working weight and best set, and CSV export.
+- **Home dashboard:** workouts, sets and records this week, the days trained, and the latest records.
+- **Stats:** past sessions, progress per exercise with trend lines and charts, sets and volume per week, hard sets per muscle per week, every personal record, and CSV export.
 - **Editable plan:** days and exercises can be added, removed, reordered and edited in Settings.
 - **Google Sheets sync (optional):** finished sessions are queued locally and sent to an Apps Script web app. A failed sync never loses data.
 

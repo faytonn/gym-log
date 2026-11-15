@@ -163,7 +163,7 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
 
       <div className="home-nav">
         <button type="button" className="btn" onClick={onHistory}>
-          History
+          Stats
         </button>
         <button type="button" className="btn" onClick={onMuscles}>
           Muscles

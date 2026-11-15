@@ -17,7 +17,7 @@ const W = 340;
 const H = 150;
 const PAD = { l: 34, r: 14, t: 12, b: 22 };
 
-function niceTicks(min: number, max: number): number[] {
+export function niceTicks(min: number, max: number): number[] {
   if (min === max) return [min];
   const span = max - min;
   const raw = span / 3;

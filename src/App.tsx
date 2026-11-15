@@ -168,7 +168,7 @@ export function App() {
         />
       );
     case 'history':
-      return <History sessions={sessions} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
+      return <History plan={plan} sessions={sessions} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
     case 'muscles':
       return <Muscles plan={plan} sessions={sessions} onBack={home} />;
     case 'settings':

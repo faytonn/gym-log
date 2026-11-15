@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { findRecords, weekSummary } from './stats';
+import { seedPlan } from './seed';
+import { exerciseProgress, findRecords, weekSummary, weeklyTotals } from './stats';
 import type { LoadKind, Session } from './types';
 
 const DAY = 86_400_000;
@@ -100,5 +101,86 @@ describe('weekSummary', () => {
 
   it('is empty for a week with no training', () => {
     expect(weekSummary([], monday)).toMatchObject({ workouts: 0, sets: 0 });
+  });
+});
+
+describe('exerciseProgress', () => {
+  const sessions = [
+    workout('c', monday + 14 * DAY, [['Lateral raise', 'weight', 6, [12, 12]], ['Assisted pull-up', 'assist', 32.5, [7]]]),
+    workout('a', monday, [['Lateral raise', 'weight', 5, [12, 11]], ['Assisted pull-up', 'assist', 35, [8]], ['Hanging knee/leg raise', 'bodyweight', 0, [10]]]),
+    workout('b', monday + 7 * DAY, [['Lateral raise', 'weight', 5, [14, 13]]]),
+  ];
+  const all = exerciseProgress(sessions);
+  const get = (name: string) => all.find((p) => p.name === name)!;
+
+  it('lists every exercise once, by name', () => {
+    expect(all.map((p) => p.name)).toEqual(['Assisted pull-up', 'Hanging knee/leg raise', 'Lateral raise']);
+  });
+
+  it('gives first and latest best set, best weight and estimated 1RM', () => {
+    const p = get('Lateral raise');
+    expect(p.sessions).toBe(3);
+    expect(p.first).toEqual({ weight: 5, reps: 12 });
+    expect(p.latest).toEqual({ weight: 6, reps: 12 });
+    expect(p.bestWeight).toBe(6);
+    expect(p.e1rmFirst).toBe(7);
+    expect(p.e1rmLatest).toBe(8.4);
+    expect(p.e1rmBest).toBe(8.4);
+    expect(p.changePct).toBe(20);
+    expect(p.trend).toHaveLength(3);
+    expect(p.firstAt).toBe(monday);
+  });
+
+  it('assisted work: best weight is the least assist and there is no 1RM estimate', () => {
+    const p = get('Assisted pull-up');
+    expect(p.bestWeight).toBe(32.5);
+    expect(p.e1rmLatest).toBeNull();
+  });
+
+  it('has no change figure after one session', () => {
+    expect(get('Hanging knee/leg raise').changePct).toBeNull();
+  });
+});
+
+describe('weeklyTotals', () => {
+  const plan = seedPlan();
+  const now = monday + 16 * DAY; // Wednesday, two weeks after the first workout
+  const sessions = [
+    workout('a', monday, [['Lateral raise', 'weight', 5, [12, 12, 12]]]),
+    workout('b', monday + DAY, [['Assisted pull-up', 'assist', 35, [8, 8]]]),
+    workout('c', monday + 15 * DAY, [['Lateral raise', 'weight', 6, [12, 10]]]),
+  ];
+  const weeks = weeklyTotals(sessions, plan, now);
+
+  it('ends with the current week and shows at least four weeks, oldest first', () => {
+    expect(weeks).toHaveLength(4);
+    expect(new Date(weeks[3].start)).toEqual(new Date(2026, 10, 23));
+    expect(new Date(weeks[1].start)).toEqual(new Date(2026, 10, 9));
+    expect(weeks[0].start).toBeLessThan(weeks[1].start);
+  });
+
+  it('adds up workouts, sets and volume per week, leaving assist out of the volume', () => {
+    expect(weeks[1]).toMatchObject({ workouts: 2, sets: 5, volume: 5 * 36 });
+    expect(weeks[3]).toMatchObject({ workouts: 1, sets: 2, volume: 6 * 22 });
+  });
+
+  it('includes weeks with no training as zeros', () => {
+    expect(weeks[2]).toMatchObject({ workouts: 0, sets: 0, volume: 0 });
+    expect(weeks[2].muscles['side-delts']).toBe(0);
+  });
+
+  it('counts hard sets per muscle from the plan mapping', () => {
+    expect(weeks[1].muscles['side-delts']).toBe(3);
+    expect(weeks[1].muscles.lats).toBe(2);
+    expect(weeks[1].muscles['upper-back']).toBe(1.5 + 1);
+  });
+
+  it('shows at most eight weeks', () => {
+    const old = workout('old', monday - 200 * DAY, [['Leg curl', 'weight', 39, [10]]]);
+    expect(weeklyTotals([old, ...sessions], plan, now)).toHaveLength(8);
+  });
+
+  it('still shows four empty weeks with no workouts at all', () => {
+    expect(weeklyTotals([], plan, now).map((w) => w.sets)).toEqual([0, 0, 0, 0]);
   });
 });
