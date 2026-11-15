@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { withMuscles } from './muscles';
-import { seedPlan } from './seed';
+import { isSupersededDefault, seedPlan } from './seed';
 import { DEFAULT_SETTINGS, type ActiveSession, type Plan, type Session, type Settings } from './types';
 
 interface KV {
@@ -32,7 +32,9 @@ export async function loadPlan(): Promise<Plan> {
   if (row) {
     // Plans saved before muscle data existed get the default mapping once.
     const stored = row.value as Plan;
-    const plan = withMuscles(stored);
+    let plan = withMuscles(stored);
+    // A phone that still holds an earlier default plan, unedited, gets the current default.
+    if (isSupersededDefault(plan)) plan = seedPlan();
     if (plan !== stored) await db.kv.put({ key: PLAN, value: plan });
     return plan;
   }

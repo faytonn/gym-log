@@ -100,3 +100,31 @@ export function seedPlan(): Plan {
     ],
   };
 }
+
+/**
+ * Fingerprint of everything in a plan that a person can edit. Two plans with the same
+ * signature are the same plan.
+ */
+export function planSignature(plan: Plan): number {
+  const text = JSON.stringify(
+    plan.days.map((d) => [
+      d.label,
+      d.name,
+      d.exercises.map((e) => [e.name, e.sets, e.repMin, e.repMax, e.startWeight, e.rest, e.restSeconds, e.kind, e.increment, e.note, e.primaryMuscles, e.secondaryMuscles]),
+    ]),
+  );
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Signatures of earlier default plans. See src/testdata for the plans they belong to. */
+export const SUPERSEDED_DEFAULTS: number[] = [808843619];
+
+/**
+ * True when a saved plan is an earlier default that was never edited. Such a plan is replaced
+ * by the current default on load. A plan with any edit is left alone.
+ */
+export function isSupersededDefault(plan: Plan): boolean {
+  return SUPERSEDED_DEFAULTS.includes(planSignature(plan));
+}
