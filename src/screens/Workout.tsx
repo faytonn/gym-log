@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { RestTimer } from '../components/RestTimer';
 import { keepAwake, unlockAudio } from '../device';
-import { findLastEntry } from '../progression';
+import { findLastEntry, trendFor } from '../progression';
 import type { ActiveEntry, ActiveSession, PlanDay, Session, Settings } from '../types';
 import { countSets, fmtDuration, initialEntry, repsPrefill, restSecondsFor } from '../workout';
 
@@ -47,6 +47,12 @@ export function Workout({ day, active, sessions, settings, update, onFinish, onD
     for (const ex of day.exercises) m.set(ex.id, findLastEntry(sessions, ex.name, active.id));
     return m;
   }, [day, sessions, active.id]);
+
+  const trends = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const ex of day.exercises) m.set(ex.id, trendFor(sessions, ex.name, ex.kind));
+    return m;
+  }, [day, sessions]);
 
   const entryFor = (exId: string): ActiveEntry => {
     const ex = day.exercises.find((e) => e.id === exId)!;
@@ -105,7 +111,7 @@ export function Workout({ day, active, sessions, settings, update, onFinish, onD
         </button>
         <div className="topbar-title">
           <span className="topbar-sub">
-            {day.label} · {fmtDuration(now - active.startedAt)} · {total}/{planned} sets
+            {day.label} · T+{fmtDuration(now - active.startedAt)} · {String(total).padStart(2, '0')}/{planned} sets
           </span>
           <span>{day.name}</span>
         </div>
@@ -122,6 +128,7 @@ export function Workout({ day, active, sessions, settings, update, onFinish, onD
             ex={ex}
             entry={entryFor(ex.id)}
             last={lastByExercise.get(ex.id) ?? null}
+            trend={trends.get(ex.id) ?? []}
             restSeconds={restSecondsFor(ex, settings)}
             expanded={open.has(ex.id)}
             onToggle={() => toggle(ex.id)}

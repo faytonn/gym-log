@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exerciseKey, findLastEntry, nextDayId, nextHint, roundKg, workingWeight } from './progression';
+import { exerciseKey, findLastEntry, nextDayId, nextHint, roundKg, sessionScore, setDelta, trendFor, workingWeight } from './progression';
 import type { LoggedSet, PlanExercise, Session, SessionEntry } from './types';
 
 type Ex = Pick<PlanExercise, 'repMin' | 'repMax' | 'kind' | 'increment'>;
@@ -171,4 +171,47 @@ describe('nextDayId: rotation', () => {
     expect(nextDayId(days, [{ dayId: 'gone', finishedAt: 1 }])).toBe('mon');
   });
   it('handles an empty plan', () => expect(nextDayId([], [])).toBeNull());
+});
+
+describe('setDelta', () => {
+  it('has nothing to compare on a first session', () => expect(setDelta('weight', { weight: 5, reps: 12 }, undefined)).toBeNull());
+  it('compares reps at the same weight', () => {
+    expect(setDelta('weight', { weight: 5, reps: 16 }, { weight: 5, reps: 15 })).toEqual({ text: '+1', better: true });
+    expect(setDelta('weight', { weight: 5, reps: 13 }, { weight: 5, reps: 15 })).toEqual({ text: '−2', better: false });
+    expect(setDelta('weight', { weight: 5, reps: 15 }, { weight: 5, reps: 15 })).toEqual({ text: '=', better: false });
+  });
+  it('shows the weight change when the weight differs', () => {
+    expect(setDelta('weight', { weight: 15, reps: 8 }, { weight: 12.5, reps: 12 })).toEqual({ text: '+2.5kg', better: true });
+  });
+  it('less assist is better', () => {
+    expect(setDelta('assist', { weight: 32.5, reps: 6 }, { weight: 35, reps: 10 })).toEqual({ text: '−2.5kg', better: true });
+    expect(setDelta('assist', { weight: 40, reps: 10 }, { weight: 35, reps: 10 })?.better).toBe(false);
+  });
+});
+
+describe('sessionScore and trendFor', () => {
+  it('goes up with more reps and with more weight', () => {
+    const base = sessionScore('weight', sets(10, 10, 9));
+    expect(sessionScore('weight', sets(10, 11, 9))).toBeGreaterThan(base);
+    expect(sessionScore('weight', sets(12.5, 10, 9))).toBeGreaterThan(base);
+  });
+  it('goes up when the assist goes down', () => {
+    expect(sessionScore('assist', sets(30, 8))).toBeGreaterThan(sessionScore('assist', sets(35, 8)));
+  });
+  it('uses reps for bodyweight work', () => {
+    expect(sessionScore('bodyweight', sets(0, 15))).toBeGreaterThan(sessionScore('bodyweight', sets(0, 12)));
+  });
+  it('returns the latest sessions oldest first, across days', () => {
+    const sessions = [
+      session('c', 3000, [{ name: 'Lateral raise', sets: sets(5, 15) }], 'sat'),
+      session('a', 1000, [{ name: 'Lateral raise', sets: sets(5, 12) }], 'mon'),
+      session('b', 2000, [{ name: 'Lateral raise', sets: sets(5, 14) }], 'tue'),
+      session('x', 2500, [{ name: 'Leg curl', sets: sets(39, 10) }], 'tue'),
+    ];
+    const t = trendFor(sessions, 'Lateral raise', 'weight');
+    expect(t).toHaveLength(3);
+    expect(t[0]).toBeLessThan(t[1]);
+    expect(t[1]).toBeLessThan(t[2]);
+    expect(trendFor(sessions, 'Lateral raise', 'weight', 2)).toEqual(t.slice(1));
+  });
 });

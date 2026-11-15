@@ -10,6 +10,8 @@ interface Props {
   onSkip: () => void;
 }
 
+const SEGMENTS = 15;
+
 /**
  * Countdown based on an absolute end time (persisted with the session), so it stays correct
  * after the phone locks or the app is closed and reopened.
@@ -40,24 +42,31 @@ export function RestTimer({ endsAt, total, sound, onAdjust, onSkip }: Props) {
 
   if (!endsAt) return null;
   const done = left <= 0;
-  const pct = total > 0 ? Math.min(100, Math.max(0, (1 - left / (total * 1000)) * 100)) : 100;
+  const elapsed = total > 0 ? Math.min(1, Math.max(0, 1 - left / (total * 1000))) : 1;
+  const filled = Math.round(elapsed * SEGMENTS);
 
   return (
-    <div className={`rest ${done ? 'rest-done' : ''}`} role="timer" aria-live="polite">
-      <div className="rest-bar" style={{ width: `${pct}%` }} />
-      <button type="button" className="rest-adj" onClick={() => onAdjust(-15)}>
-        −15
-      </button>
-      <div className="rest-time">
-        <span className="rest-label">{done ? 'Rest over' : 'Rest'}</span>
-        <span className="rest-clock">{done ? 'Go!' : fmtDuration(left)}</span>
+    <div className={`rest ${done ? 'rest-done' : ''}`} role="timer" aria-live="off" aria-label={done ? 'Rest over' : `Rest, ${fmtDuration(left)} left`}>
+      <div className="rest-r1">
+        <span className="lab">{done ? 'Rest over' : `Rest · ${fmtDuration(total * 1000)}`}</span>
+        <span className="rest-clock">{done ? 'GO' : fmtDuration(left)}</span>
       </div>
-      <button type="button" className="rest-adj" onClick={() => onAdjust(15)}>
-        +15
-      </button>
-      <button type="button" className="rest-skip" onClick={onSkip}>
-        {done ? 'OK' : 'Skip'}
-      </button>
+      <div className="segs" aria-hidden="true">
+        {Array.from({ length: SEGMENTS }, (_, i) => (
+          <i key={i} className={i < filled ? 'f' : ''} />
+        ))}
+      </div>
+      <div className="rest-r2">
+        <button type="button" onClick={() => onAdjust(-15)}>
+          −15
+        </button>
+        <button type="button" onClick={() => onAdjust(15)}>
+          +15
+        </button>
+        <button type="button" className="rest-skip" onClick={onSkip}>
+          {done ? 'OK' : 'Skip'}
+        </button>
+      </div>
     </div>
   );
 }

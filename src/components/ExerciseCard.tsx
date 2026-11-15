@@ -1,10 +1,11 @@
-import { fmtKg, nextHint, workingWeight, type LastEntry } from '../progression';
 import { useState } from 'react';
+import { MUSCLE_LABEL, type Muscle } from '../muscles';
+import { fmtKg, nextHint, setDelta, type LastEntry } from '../progression';
 import type { ActiveEntry, PlanExercise } from '../types';
 import { fmtDate, fmtDuration } from '../workout';
-import { MUSCLE_LABEL, type Muscle } from '../muscles';
 import { BodyMap, type MapLevel } from './BodyMap';
 import { RepWheel } from './RepWheel';
+import { Sparkline } from './Sparkline';
 import { WeightField } from './WeightField';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   ex: PlanExercise;
   entry: ActiveEntry;
   last: LastEntry | null;
+  /** Scores of the last few sessions, oldest first, for the trend line. */
+  trend: number[];
   restSeconds: number;
   expanded: boolean;
   onToggle: () => void;
@@ -23,6 +26,12 @@ interface Props {
 const RIR = [0, 1, 2, 3, 4, 5];
 const MAP_KEY = 'gym-log:show-muscle-map';
 
+function weightLabel(ex: PlanExercise): string {
+  if (ex.kind === 'assist') return 'Assist kg';
+  if (ex.kind === 'bodyweight') return 'Added kg';
+  return 'Weight kg';
+}
+
 function readMapPref(): boolean {
   try {
     return localStorage.getItem(MAP_KEY) === '1';
@@ -30,6 +39,8 @@ function readMapPref(): boolean {
     return false;
   }
 }
+
+const names = (list: Muscle[]) => list.map((m) => MUSCLE_LABEL[m]).join(', ');
 
 function Muscles({ ex }: { ex: PlanExercise }) {
   const [open, setOpen] = useState(readMapPref);
@@ -40,7 +51,6 @@ function Muscles({ ex }: { ex: PlanExercise }) {
   const levels: Partial<Record<Muscle, MapLevel>> = {};
   for (const m of secondary) levels[m] = 'secondary';
   for (const m of primary) levels[m] = 'primary';
-  const names = (list: Muscle[]) => list.map((m) => MUSCLE_LABEL[m]).join(', ');
   const toggle = () => {
     const next = !open;
     setOpen(next);
@@ -55,14 +65,14 @@ function Muscles({ ex }: { ex: PlanExercise }) {
     <div className="muscles">
       <button type="button" className="muscles-head" onClick={toggle} aria-expanded={open}>
         <span className="muscles-text">
-          <span className="muted">Muscles</span>
+          <span className="lab">Muscles</span>
           <span>
-            <strong>{names(primary)}</strong>
+            {names(primary)}
             {secondary.length > 0 && <span className="muted"> + {names(secondary)}</span>}
           </span>
         </span>
-        <span className="chev" aria-hidden="true">
-          {open ? '▴' : '▾'}
+        <span className="lab" aria-hidden="true">
+          {open ? 'Hide map' : 'Map'}
         </span>
       </button>
       {open && (
@@ -72,7 +82,12 @@ function Muscles({ ex }: { ex: PlanExercise }) {
           detail={(m) => (primary.includes(m) ? 'primary' : secondary.includes(m) ? 'secondary' : 'not targeted')}
           caption={
             <span className="map-key">
-              <span className="key-swatch bm-primary" /> Primary <span className="key-swatch bm-secondary" /> Secondary
+              <span className="map-key-item">
+                <span className="key-swatch bm-primary" /> Primary
+              </span>
+              <span className="map-key-item">
+                <span className="key-swatch bm-secondary" /> Secondary
+              </span>
             </span>
           }
         />
@@ -81,31 +96,27 @@ function Muscles({ ex }: { ex: PlanExercise }) {
   );
 }
 
-function weightLabel(ex: PlanExercise): string {
-  if (ex.kind === 'assist') return 'Assist';
-  if (ex.kind === 'bodyweight') return 'Added weight';
-  return 'Weight';
-}
-
-export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, onToggle, onChange, onSaveSet, onDeleteSet }: Props) {
+export function ExerciseCard({ index, ex, entry, last, trend, restSeconds, expanded, onToggle, onChange, onSaveSet, onDeleteSet }: Props) {
   const hint = nextHint(ex, last?.entry ?? null);
   const done = entry.sets.length >= ex.sets;
   const setNo = entry.sets.length + 1;
   const showSuggestion = hint.suggestedWeight !== null && hint.suggestedWeight !== entry.weight && entry.sets.length === 0;
+  const primary = ex.primaryMuscles ?? [];
+  const rows = Math.max(ex.sets, entry.sets.length);
+  const lastSets = last?.entry.sets ?? [];
 
   return (
-    <section className={`card ex-card ${done ? 'ex-done' : ''}`} id={`ex-${ex.id}`}>
+    <section className={`panel ex-card ${done ? 'ex-done' : ''} ${expanded ? 'ticks' : ''}`} id={`ex-${ex.id}`}>
       <button type="button" className="ex-head" onClick={onToggle} aria-expanded={expanded}>
-        <span className="ex-index">{done ? '✓' : index + 1}</span>
         <span className="ex-title">
-          <span className="ex-name">{ex.name}</span>
-          <span className="ex-meta">
-            {ex.sets} × {ex.repMin}–{ex.repMax} · {ex.rest === 'compound' ? 'Compound' : 'Isolation'} · rest {fmtDuration(restSeconds * 1000)}
+          <span className="lab">
+            {String(index + 1).padStart(2, '0')} · {primary.length > 0 ? `${names(primary)} · ` : ''}
+            {ex.sets} × {ex.repMin}–{ex.repMax}
           </span>
+          <span className="ex-name">{ex.name}</span>
         </span>
-        <span className="ex-count">
-          {entry.sets.length}/{ex.sets}
-        </span>
+        <Sparkline values={trend} />
+        <span className="ex-count">{done ? 'OK' : `${entry.sets.length}/${ex.sets}`}</span>
       </button>
 
       {expanded && (
@@ -113,22 +124,50 @@ export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, on
           {ex.note && <p className="ex-note">{ex.note}</p>}
           <Muscles ex={ex} />
 
-          <div className="ex-last">
-            <span className="muted">Last time</span>
-            {last ? (
-              <span>
-                <strong>{fmtKg(workingWeight(last.entry.sets)!)} kg</strong>
-                {ex.kind === 'assist' && ' assist'} · {last.entry.sets.map((s) => s.reps).join(' · ')}
-                {last.entry.rir !== null && <span className="muted"> · {last.entry.rir} left</span>}
-                <span className="muted"> · {fmtDate(last.session.finishedAt)}</span>
-              </span>
-            ) : (
-              <span className="muted">Not logged yet</span>
-            )}
+          <div className="readout">
+            <span className="lab">
+              {last
+                ? `Last · ${fmtDate(last.session.finishedAt)}${last.entry.rir !== null ? ` · ${last.entry.rir} left in tank` : ''}`
+                : `Not logged yet · rest ${fmtDuration(restSeconds * 1000)}`}
+            </span>
+            {Array.from({ length: rows }, (_, i) => {
+              const set = entry.sets[i];
+              const prev = lastSets[i];
+              if (set) {
+                const d = setDelta(ex.kind, set, prev);
+                return (
+                  <button
+                    type="button"
+                    key={i}
+                    className="line line-done"
+                    aria-label={`Set ${i + 1}: ${fmtKg(set.weight)} kg, ${set.reps} reps. Tap to delete`}
+                    onClick={() => {
+                      if (confirm(`Delete set ${i + 1} (${fmtKg(set.weight)} kg × ${set.reps})?`)) onDeleteSet(i);
+                    }}
+                  >
+                    <span className="line-k">S{i + 1}</span>
+                    <span>
+                      {fmtKg(set.weight)} × {set.reps}
+                    </span>
+                    <span className={d?.better ? 'up' : 'flat'}>{d?.text ?? ''}</span>
+                    <span className="up">OK</span>
+                  </button>
+                );
+              }
+              return (
+                <div key={i} className={`line ${i === entry.sets.length ? 'line-now' : 'line-pending'}`}>
+                  <span className="line-k">S{i + 1}</span>
+                  <span>{prev ? `last ${fmtKg(prev.weight)} × ${prev.reps}` : '—'}</span>
+                  <span />
+                  <span>{i === entry.sets.length ? 'NOW' : '··'}</span>
+                </div>
+              );
+            })}
           </div>
 
           <div className={`hint hint-${hint.kind}`}>
             <div>
+              <span className="lab">Target</span>
               <div className="hint-text">{hint.text}</div>
               <div className="hint-detail">{hint.detail}</div>
             </div>
@@ -138,23 +177,6 @@ export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, on
               </button>
             )}
           </div>
-
-          {entry.sets.length > 0 && (
-            <div className="sets">
-              {entry.sets.map((s, i) => (
-                <button
-                  type="button"
-                  key={i}
-                  className="set-chip"
-                  onClick={() => {
-                    if (confirm(`Delete set ${i + 1} (${fmtKg(s.weight)} kg × ${s.reps})?`)) onDeleteSet(i);
-                  }}
-                >
-                  <span className="muted">{i + 1}</span> {fmtKg(s.weight)}×{s.reps}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="entry-row">
             <WeightField label={weightLabel(ex)} value={entry.weight} onChange={(weight) => onChange({ weight })} />
@@ -166,7 +188,7 @@ export function ExerciseCard({ index, ex, entry, last, restSeconds, expanded, on
           </button>
 
           <div className="rir">
-            <span className="muted">Reps left in tank</span>
+            <span className="lab">Reps left in tank</span>
             <div className="rir-row" role="radiogroup" aria-label="Reps left in tank">
               {RIR.map((n) => (
                 <button

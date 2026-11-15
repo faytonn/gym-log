@@ -126,3 +126,47 @@ export function nextDayId(dayIds: string[], sessions: Pick<Session, 'dayId' | 'f
   if (i === -1) return dayIds[0];
   return dayIds[(i + 1) % dayIds.length];
 }
+
+export interface SetDelta {
+  /** "+1", "−2", "=" for reps at the same weight; "+2.5kg" when the weight changed. */
+  text: string;
+  better: boolean;
+}
+
+/** Change of one set against the same set last session. Null when there is nothing to compare with. */
+export function setDelta(kind: LoadKind, set: LoggedSet, prev: LoggedSet | undefined): SetDelta | null {
+  if (!prev) return null;
+  if (set.weight !== prev.weight) {
+    const d = roundKg(set.weight - prev.weight);
+    return { text: `${d > 0 ? '+' : '−'}${fmtKg(Math.abs(d))}kg`, better: kind === 'assist' ? d < 0 : d > 0 };
+  }
+  const d = set.reps - prev.reps;
+  return { text: d === 0 ? '=' : `${d > 0 ? '+' : '−'}${Math.abs(d)}`, better: d > 0 };
+}
+
+/**
+ * One number per session for the small trend line: estimated 1-rep max (Epley) of the best set,
+ * so both more weight and more reps move it up. Assist counts as less load; bodyweight uses reps.
+ */
+export function sessionScore(kind: LoadKind, sets: LoggedSet[]): number {
+  let best = 0;
+  for (const s of sets) {
+    const load = kind === 'bodyweight' ? 1 : kind === 'assist' ? Math.max(0, 100 - s.weight) : s.weight;
+    best = Math.max(best, load * (1 + s.reps / 30));
+  }
+  return best;
+}
+
+/** Scores of the most recent sessions of an exercise, oldest first. */
+export function trendFor(sessions: Session[], name: string, kind: LoadKind, limit = 6): number[] {
+  const key = exerciseKey(name);
+  const rows: { t: number; score: number }[] = [];
+  for (const s of sessions) {
+    const e = s.entries.find((x) => exerciseKey(x.name) === key && x.sets.length > 0);
+    if (e) rows.push({ t: s.finishedAt, score: sessionScore(kind, e.sets) });
+  }
+  return rows
+    .sort((a, b) => a.t - b.t)
+    .slice(-limit)
+    .map((r) => r.score);
+}

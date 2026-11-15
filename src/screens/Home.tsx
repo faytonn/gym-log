@@ -28,48 +28,48 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
   return (
     <div className="screen home">
       <header className="home-head">
-        <h1>Gym Log</h1>
+        <div>
+          <span className="lab">{fmtDate(Date.now())} · {sessions.length} sessions logged</span>
+          <h1>Gym Log</h1>
+        </div>
         {pending > 0 && (
-          <button type="button" className="pill" onClick={onSync}>
+          <button type="button" className="tag tag-btn" onClick={onSync}>
             {pending} to sync{syncLabel ? ` · ${syncLabel}` : ''}
           </button>
         )}
       </header>
 
       {activeDay && (
-        <button type="button" className="card resume" onClick={onResume}>
+        <button type="button" className="panel ticks resume" onClick={onResume}>
+          <span className="lab">In progress · {countSets(active)} sets logged</span>
           <span className="resume-title">Resume {activeDay.name}</span>
-          <span className="muted">{countSets(active)} sets logged</span>
         </button>
       )}
 
       <div className="days">
-        {plan.days.map((d) => {
+        {plan.days.map((d, i) => {
           const isNext = d.id === next;
           const last = lastDone.get(d.id);
           return (
-            <button type="button" key={d.id} className={`day-btn ${isNext ? 'next' : ''}`} onClick={() => onStart(d.id)}>
-              <span className="day-label">
-                {d.label}
-                {isNext && <span className="badge">Next</span>}
+            <button type="button" key={d.id} className={`panel day-btn ${isNext ? 'next ticks' : ''}`} onClick={() => onStart(d.id)}>
+              <span className="lab">
+                {String(i + 1).padStart(2, '0')} · {d.label} · {d.exercises.length} exercises{last ? ` · last ${fmtDate(last)}` : ''}
               </span>
               <span className="day-name">{d.name}</span>
-              <span className="day-sub">
-                {d.exercises.length} exercises{last ? ` · last ${fmtDate(last)}` : ''}
-              </span>
+              {isNext && <span className="tag day-tag">Next</span>}
             </button>
           );
         })}
       </div>
 
       <div className="home-nav">
-        <button type="button" className="nav-btn" onClick={onHistory}>
+        <button type="button" className="btn" onClick={onHistory}>
           History
         </button>
-        <button type="button" className="nav-btn" onClick={onMuscles}>
+        <button type="button" className="btn" onClick={onMuscles}>
           Muscles
         </button>
-        <button type="button" className="nav-btn" onClick={onSettings}>
+        <button type="button" className="btn" onClick={onSettings}>
           Settings
         </button>
       </div>

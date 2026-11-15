@@ -19,7 +19,7 @@ export function Finished({ session, settings, syncing, syncLabel, onSync, onDone
   return (
     <div className="screen finished">
       <div className="finished-body">
-        <div className="big-check">✓</div>
+        <span className="lab">Session complete</span>
         <h1>Workout saved</h1>
         <p className="muted">
           {session.dayLabel} · {session.dayName} · {session.entries.length} exercises · {sets} sets ·{' '}

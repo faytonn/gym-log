@@ -3,8 +3,8 @@
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-const BG = [14, 15, 18];
-const FG = [184, 243, 74];
+const BG = [14, 14, 14];
+const FG = [255, 77, 46];
 
 // Dumbbell made of rectangles, in a 0..1 coordinate space.
 function shapes(scale) {
