@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { DEMO } from './mode';
 import { withMuscles } from './muscles';
+import { toOneLegDay } from './planMigration';
 import { isSupersededDefault, seedPlan } from './seed';
 import { DEFAULT_SETTINGS, type ActiveSession, type Plan, type Session, type Settings } from './types';
 
@@ -28,20 +29,30 @@ export const db = new GymDB();
 const PLAN = 'plan';
 const SETTINGS = 'settings';
 const ACTIVE = 'active';
+/** Names of the one-time plan changes this phone has already been through. */
+const PLAN_CHANGES = 'planChanges';
+const ONE_LEG_DAY = 'one-leg-day';
 
 export async function loadPlan(): Promise<Plan> {
   const row = await db.kv.get(PLAN);
+  const done = ((await db.kv.get(PLAN_CHANGES))?.value as string[] | undefined) ?? [];
+  const pending = !done.includes(ONE_LEG_DAY);
+  let plan: Plan;
   if (row) {
     // Plans saved before muscle data existed get the default mapping once.
     const stored = row.value as Plan;
-    let plan = withMuscles(stored);
+    plan = withMuscles(stored);
     // A phone that still holds an earlier default plan, unedited, gets the current default.
     if (isSupersededDefault(plan)) plan = seedPlan();
+    // An edited plan keeps its edits and goes from two leg days to one, once. After that the
+    // plan is left alone, so a leg exercise put back on Friday by hand stays there.
+    else if (pending) plan = toOneLegDay(plan);
     if (plan !== stored) await db.kv.put({ key: PLAN, value: plan });
-    return plan;
+  } else {
+    plan = seedPlan();
+    await db.kv.put({ key: PLAN, value: plan });
   }
-  const plan = seedPlan();
-  await db.kv.put({ key: PLAN, value: plan });
+  if (pending) await db.kv.put({ key: PLAN_CHANGES, value: [...done, ONE_LEG_DAY] });
   return plan;
 }
 

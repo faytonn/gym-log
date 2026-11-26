@@ -19,8 +19,7 @@ export function slug(s: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function day(label: string, name: string, rows: Row[]): PlanDay {
-  const id = slug(`${label}-${name}`);
+function day(label: string, name: string, rows: Row[], id = slug(`${label}-${name}`)): PlanDay {
   return {
     id,
     label,
@@ -47,6 +46,13 @@ function day(label: string, name: string, rows: Row[]): PlanDay {
 const C: RestType = 'compound';
 const I: RestType = 'isolation';
 
+/**
+ * Tuesday and Friday keep the ids they had as "Lower A" and "Lower B", so the day rotation and
+ * the "last done" dates carry on from workouts logged before the plan went to one leg day.
+ */
+export const LEG_DAY_ID = 'tue-lower-a';
+export const UPPER_C_ID = 'fri-lower-b';
+
 /** The default plan. Editable in Settings; this is only used on first run or "Reset plan". */
 export function seedPlan(): Plan {
   return {
@@ -61,33 +67,33 @@ export function seedPlan(): Plan {
         ['Single-arm overhead cable extension', 3, 10, 15, null, I, 'Facing away, cable behind your back. Deep stretch behind your head. Log your weaker arm', { increment: 1.25 }],
         ['Face pull', 3, 12, 15, null, I, 'Rope at forehead height. Pull to your face, elbows high, thumbs back, 1s squeeze. Rear delts + upper back detail', { increment: 1.25 }],
       ]),
-      day('Tue', 'Lower A', [
+      day('Tue', 'Legs', [
         ['Leg press', 3, 8, 12, null, C, 'Find your weight in session 1: one that leaves 2 reps in the tank at 10', { increment: 5 }],
         ['Romanian deadlift', 3, 8, 10, 12.5, C, "Per dumbbell. You've used ~10; this lift usually climbs fast. Hips back, flat back"],
-        ['Leg extension', 2, 12, 15, 55, I, 'You use 50–60 depending on the gym'],
-        ['Leg curl', 2, 10, 15, 39, I, ''],
+        ['Hip thrust', 3, 8, 12, null, C, 'Machine or barbell. Find a weight in session 1 that leaves ~2 reps at 10. Chin tucked, ribs down, 1s squeeze at the top', { increment: 5 }],
+        ['Leg extension', 3, 12, 15, 55, I, 'You use 50–60 depending on the gym'],
+        ['Leg curl', 3, 10, 15, 39, I, ''],
         ['45° back extension', 2, 12, 15, 0, I, 'Bodyweight first: log 0. Hold a plate once 2×15 is easy. Round your upper back slightly, squeeze glutes at the top'],
         ['Lateral raise', 2, 12, 20, 5, I, 'Side delts recover fast, so they get hit 4x a week', { increment: 1 }],
         ['Cable crunch', 3, 10, 15, 22.5, I, "You use 20–25. Curl your ribs toward your hips; don't just bow from the hips"],
-      ]),
+      ], LEG_DAY_ID),
       day('Thu', 'Upper B', [
         ['Assisted pull-up', 4, 6, 10, 35, C, 'Log the assist weight: lower number = stronger', { kind: 'assist' }],
-        ['Single-arm chest-supported row', 3, 10, 12, 10, C, 'Per dumbbell. Upper-back thickness. Log your weaker arm'],
-        ['Machine shoulder press', 3, 8, 12, 37.5, C, "You've been using 35–40"],
+        ['One-arm dumbbell row', 3, 10, 12, 10, C, 'Per dumbbell. Knee and hand on the bench, flat back. Pull your elbow toward your hip. Log your weaker arm.'],
+        ['Hammer Strength shoulder press', 3, 8, 12, 17.5, C, 'Log the plates on one side. Add weight once all 3 sets hit 12.'],
         ['Pec deck / cable fly', 3, 12, 15, 28, I, 'Squeeze and hold 1s where your hands meet'],
         ['Rear delt fly', 3, 12, 15, 25, I, 'You use 25–28'],
         ['Cable lateral raise', 3, 12, 20, null, I, 'One arm at a time, cable at hand height. Smaller weight steps than dumbbells, tension the whole way. Log your weaker arm', { increment: 1.25 }],
         ['Triceps pushdown', 3, 10, 15, 14.6, I, 'Two-handle attachment. You use 14.6–17.4', { increment: 2.8 }],
         ['Machine biceps curl', 2, 10, 15, 25, I, 'Last exercise of the day. Slow on the way down'],
       ]),
-      day('Fri', 'Lower B', [
-        ['Hip thrust', 3, 8, 12, null, C, 'Machine or barbell. Find a weight in session 1 that leaves ~2 reps at 10. Chin tucked, ribs down, 1s squeeze at the top', { increment: 5 }],
-        ['Bulgarian split squat', 3, 8, 12, null, C, 'Per dumbbell (log 0 if bodyweight). Weaker leg first, log your weaker leg. Lean slightly forward for more glutes'],
-        ['Leg curl', 3, 10, 15, 39, I, 'Same machine as Tuesday, so the log is shared'],
+      day('Fri', 'Upper C', [
+        ['Neutral-grip lat pulldown', 3, 8, 12, 42, C, 'Close neutral (V) handle on the pulldown station. Start at your wide-grip weight; this grip is usually a bit stronger. Full stretch at the top, drive your elbows down to your sides'],
+        ['Machine chest press', 3, 8, 12, null, C, 'Find your weight in session 1: one that leaves 2 reps in the tank at 10. Handles level with mid-chest, shoulder blades pinned back so your chest does the work, not your shoulders'],
         ['Straight-arm cable pulldown', 3, 12, 15, null, I, 'Lat width for the V-taper, no biceps involved. Rope or bar, slight lean forward, arms almost straight, pull to your thighs and squeeze your lats'],
         ['Low-to-high cable fly', 3, 12, 15, null, I, 'Upper chest, no triceps involved. Cables at the bottom, sweep up to chin height, squeeze 1s. Per side', { increment: 1.25 }],
         ['Hanging knee/leg raise', 3, 10, 15, 0, I, 'Bodyweight: log 0. Tilt your pelvis up, no swinging', { kind: 'bodyweight' }],
-      ]),
+      ], UPPER_C_ID),
       day('Sat', 'Shoulders & arms', [
         ['Lateral raise', 3, 12, 20, 5, I, "Do these first while you're fresh", { increment: 1 }],
         ['EZ bar curl', 3, 8, 12, 12.5, I, 'Plates only (6.25 per side), bar not counted'],
@@ -119,7 +125,7 @@ export function planSignature(plan: Plan): number {
 }
 
 /** Signatures of earlier default plans. See src/testdata for the plans they belong to. */
-export const SUPERSEDED_DEFAULTS: number[] = [808843619];
+export const SUPERSEDED_DEFAULTS: number[] = [808843619, 233830516];
 
 /**
  * True when a saved plan is an earlier default that was never edited. Such a plan is replaced

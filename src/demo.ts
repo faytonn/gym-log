@@ -10,6 +10,7 @@ const FOUND_WEIGHT: Record<string, number> = {
   'leg press': 100,
   'hip thrust': 60,
   'bulgarian split squat': 10,
+  'machine chest press': 25,
   'single-arm overhead cable extension': 7.5,
   'face pull': 15,
   'cable lateral raise': 5,
