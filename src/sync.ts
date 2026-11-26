@@ -16,6 +16,9 @@ interface ScriptResponse {
   error?: string;
   appended?: number;
   duplicate?: boolean;
+  /** Answer to a restore request: the rows of the "Sets" and "Sessions" tabs. */
+  sets?: unknown[][];
+  sessions?: unknown[][];
 }
 
 /**

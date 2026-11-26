@@ -1,29 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchSheetSessions, importSessions, makeBackup, markBackedUp, newSessions, onlyOnThisPhone, parseBackup, restoreBackup } from '../backup';
+import { ask, choose, tell } from '../components/Dialog';
 import { Stepper } from '../components/Stepper';
 import { TextField } from '../components/TextField';
 import { DEMO } from '../mode';
-import { savePlan, saveSettings } from '../db';
+import { loadSettings, requestPersistentStorage, savePlan, saveSettings } from '../db';
+import { localDate } from '../export';
+import { pickTextFile, saveFile } from '../files';
 import { MUSCLES, MUSCLE_LABEL, defaultMuscles, type Muscle } from '../muscles';
 import { seedPlan, slug } from '../seed';
 import { testConnection } from '../sync';
-import type { LoadKind, Plan, PlanDay, PlanExercise, RestType, Settings } from '../types';
-import { fmtDuration } from '../workout';
+import type { LoadKind, Plan, PlanDay, PlanExercise, RestType, Session, Settings } from '../types';
+import { fmtDate, fmtDuration } from '../workout';
 
 interface Props {
   plan: Plan;
   settings: Settings;
+  sessions: Session[];
+  /** When the last backup file was saved, 0 for never. */
+  backedUpAt: number;
   pending: number;
   syncing: boolean;
   syncLabel: string | null;
   onSync: () => void;
-  onBack: () => void;
 }
 
 function uid(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, onSync, onBack }: Props) {
+export function SettingsScreen({ plan, settings, sessions, backedUpAt, pending, syncing, syncLabel, onSync }: Props) {
   const set = (patch: Partial<Settings>) => void saveSettings({ ...settings, ...patch });
   const [test, setTest] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
@@ -31,7 +37,8 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
   const runTest = async () => {
     setTest('Testing…');
     try {
-      setTest(`✓ ${await testConnection(settings)}`);
+      // Read the stored settings: a field that was just edited saves on blur, after this render.
+      setTest(`✓ ${await testConnection(await loadSettings())}`);
     } catch (e) {
       setTest(`✗ ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -39,17 +46,15 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
 
   return (
     <div className="screen">
-      <header className="topbar">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to home">
-          ‹
-        </button>
+      <header className="topbar topbar-plain">
         <div className="topbar-title">
           <span>Settings</span>
         </div>
-        <span className="icon-btn" />
       </header>
 
       <div className="cards">
+        <BackupCard plan={plan} settings={settings} sessions={sessions} backedUpAt={backedUpAt} />
+
         <section className="card form">
           <h2>Google Sheets sync</h2>
           {DEMO ? (
@@ -71,10 +76,17 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
           <label className="field">
             <span className="muted">Secret token</span>
             <div className="input-row">
+              {/* Not type="password": a password manager would fill in a saved login here, over the stored token. */}
               <TextField
-                type={showToken ? 'text' : 'password'}
+                type="text"
+                name="gym-log-sync-token"
+                className={showToken ? undefined : 'masked'}
+                autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
+                data-1p-ignore
+                data-lpignore="true"
                 value={settings.syncToken}
                 onCommit={(v) => set({ syncToken: v.trim() })}
               />
@@ -110,6 +122,100 @@ export function SettingsScreen({ plan, settings, pending, syncing, syncLabel, on
         <PlanEditor plan={plan} />
       </div>
     </div>
+  );
+}
+
+function BackupCard({ plan, settings, sessions, backedUpAt }: { plan: Plan; settings: Settings; sessions: Session[]; backedUpAt: number }) {
+  const [busy, setBusy] = useState(false);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  const configured = !DEMO && Boolean(settings.syncUrl && settings.syncToken);
+  const open = onlyOnThisPhone(sessions, backedUpAt).length;
+  const queued = configured ? sessions.filter((s) => s.synced === 0).length : 0;
+
+  useEffect(() => {
+    void requestPersistentStorage().then(setPersisted);
+  }, []);
+
+  const save = async () => {
+    const backup = await makeBackup();
+    if (await saveFile(`gym-log-backup-${localDate(backup.exportedAt)}.json`, JSON.stringify(backup), 'application/json')) await markBackedUp(backup.exportedAt);
+  };
+
+  const report = (n: number, found: number) =>
+    tell(n > 0 ? `${n} workout${n === 1 ? '' : 's'} restored` : 'Nothing to restore', n > 0 ? undefined : `All ${found} workout${found === 1 ? '' : 's'} found are already on this phone.`);
+
+  const fromFile = async () => {
+    try {
+      const text = await pickTextFile('application/json,.json');
+      if (text === null) return;
+      const backup = parseBackup(text);
+      const fresh = (await newSessions(backup.sessions)).length;
+      const what = await choose({
+        title: `Backup from ${fmtDate(backup.exportedAt)}`,
+        body: `${backup.sessions.length} workout${backup.sessions.length === 1 ? '' : 's'} in the file, ${fresh} not on this phone yet. Workouts already here are not changed.`,
+        actions: [
+          { label: 'Restore workouts', value: 'sessions' as const, kind: 'accent' },
+          { label: 'Restore workouts and replace plan', value: 'all' as const },
+        ],
+      });
+      if (!what) return;
+      await report(await restoreBackup(backup, what === 'all'), backup.sessions.length);
+    } catch (e) {
+      await tell('Restore failed', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const fromSheet = async () => {
+    setBusy(true);
+    try {
+      const found = await fetchSheetSessions(settings, plan);
+      const fresh = (await newSessions(found)).length;
+      if (fresh === 0) return await report(0, found.length);
+      const go = await ask(`Restore ${fresh} workout${fresh === 1 ? '' : 's'} from your Google Sheet?`, {
+        body: `${found.length} in the sheet, ${fresh} not on this phone yet. Workouts already here are not changed.`,
+        confirm: 'Restore workouts',
+      });
+      if (go) await report(await importSessions(found), found.length);
+    } catch (e) {
+      await tell('Restore failed', e instanceof Error ? (e.name === 'AbortError' ? 'The sheet did not answer in time. Try again.' : e.message) : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card form">
+      <h2>Backup</h2>
+      <p className="small">
+        {sessions.length === 0
+          ? 'No workouts logged yet.'
+          : configured
+            ? queued === 0
+              ? `All ${sessions.length} workouts are in your Google Sheet.`
+              : `${sessions.length - queued} of ${sessions.length} workouts are in your Google Sheet. ${queued} waiting to sync.`
+            : open === 0
+              ? `All ${sessions.length} workouts have a copy outside this phone.`
+              : `${open} of ${sessions.length} workouts are saved only on this phone.`}
+      </p>
+      <p className="small muted">
+        Last backup file: {backedUpAt ? fmtDate(backedUpAt) : 'never'}.
+        {persisted === false && " The browser may clear this app's data when the phone runs low on space. Add the app to the Home Screen and keep a backup."}
+      </p>
+      <div className="btn-row">
+        <button type="button" className="btn btn-accent" disabled={sessions.length === 0} onClick={() => void save()}>
+          Save backup file
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={() => void fromFile()}>
+          Restore from file
+        </button>
+      </div>
+      {configured && (
+        <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => void fromSheet()}>
+          {busy ? 'Reading the sheet…' : 'Restore from Google Sheet'}
+        </button>
+      )}
+      <p className="small muted">The backup file holds every workout, your plan and your settings (not the sync token). Keep it outside this phone, for example in iCloud or Google Drive.</p>
+    </section>
   );
 }
 
@@ -152,8 +258,8 @@ function PlanEditor({ plan }: { plan: Plan }) {
     setDayId(nd.id);
   };
 
-  const deleteDay = () => {
-    if (!confirm(`Delete the day "${day.name}" and its exercise list? Logged history is kept.`)) return;
+  const deleteDay = async () => {
+    if (!(await ask(`Delete the day "${day.name}"?`, { body: 'Its exercise list is deleted. Logged workouts are kept.', confirm: 'Delete day', danger: true }))) return;
     const days = plan.days.filter((d) => d.id !== day.id);
     void savePlan({ days });
     setDayId(days[0]?.id ?? '');
@@ -236,7 +342,10 @@ function PlanEditor({ plan }: { plan: Plan }) {
                   type="button"
                   className="icon-btn danger"
                   aria-label={`Remove ${ex.name}`}
-                  onClick={() => confirm(`Remove ${ex.name} from ${day.name}? Its history is kept.`) && saveDay({ ...day, exercises: day.exercises.filter((e) => e.id !== ex.id) })}
+                  onClick={async () =>
+                    (await ask(`Remove ${ex.name} from ${day.name}?`, { body: 'Its logged history is kept.', confirm: 'Remove exercise', danger: true })) &&
+                    saveDay({ ...day, exercises: day.exercises.filter((e) => e.id !== ex.id) })
+                  }
                 >
                   ✕
                 </button>
@@ -246,7 +355,7 @@ function PlanEditor({ plan }: { plan: Plan }) {
           <button type="button" className="btn btn-secondary btn-block" onClick={() => setEditing(newExercise())}>
             + Add exercise
           </button>
-          <button type="button" className="btn btn-danger-text btn-block" onClick={deleteDay}>
+          <button type="button" className="btn btn-danger-text btn-block" onClick={() => void deleteDay()}>
             Delete this day
           </button>
         </>
@@ -255,7 +364,7 @@ function PlanEditor({ plan }: { plan: Plan }) {
       <button
         type="button"
         className="btn btn-danger-text btn-block"
-        onClick={() => confirm('Replace your plan with the default plan? Logged workouts are kept.') && void savePlan(seedPlan())}
+        onClick={async () => (await ask('Reset the plan to the default?', { body: 'Your days and exercises are replaced. Logged workouts are kept.', confirm: 'Reset plan', danger: true })) && void savePlan(seedPlan())}
       >
         Reset plan to default
       </button>
@@ -280,7 +389,7 @@ function ExerciseEditor({ initial, onSave, onCancel }: { initial: PlanExercise; 
 
   const save = () => {
     const name = ex.name.trim();
-    if (!name) return alert('Give the exercise a name.');
+    if (!name) return void tell('Give the exercise a name');
     const w = parseFloat(weightText.replace(',', '.'));
     const r = parseInt(restText, 10);
     onSave({

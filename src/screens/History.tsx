@@ -3,7 +3,9 @@ import { BarChart } from '../components/BarChart';
 import { LineChart, type Point } from '../components/LineChart';
 import { Sparkline } from '../components/Sparkline';
 import { db } from '../db';
+import { ask } from '../components/Dialog';
 import { localDate, toCsv } from '../export';
+import { saveFile } from '../files';
 import { MUSCLES, MUSCLE_LABEL, volumeBand } from '../muscles';
 import { exerciseKey, fmtKg, workingWeight } from '../progression';
 import { exerciseProgress, findRecords, weeklyTotals, type ExerciseProgress } from '../stats';
@@ -16,7 +18,6 @@ interface Props {
   syncing: boolean;
   syncLabel: string | null;
   onSync: () => void;
-  onBack: () => void;
 }
 
 type Tab = 'sessions' | 'progress' | 'weekly' | 'records';
@@ -30,43 +31,21 @@ const TABS: [Tab, string][] = [
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const shortDate = (t: number) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
-async function downloadCsv(sessions: Session[]) {
-  const name = `workout-log-${localDate(Date.now())}.csv`;
-  const blob = new Blob([toCsv(sessions)], { type: 'text/csv' });
-  const file = new File([blob], name, { type: 'text/csv' });
-  // On iPhone the share sheet ("Save to Files") is the reliable way to get a file out of a home-screen app.
-  try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: name });
-      return;
-    }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') return;
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
+const downloadCsv = (sessions: Session[]) => saveFile(`workout-log-${localDate(Date.now())}.csv`, toCsv(sessions), 'text/csv');
 
-export function History({ plan, sessions, syncing, syncLabel, onSync, onBack }: Props) {
+export function History({ plan, sessions, syncing, syncLabel, onSync }: Props) {
   const [tab, setTab] = useState<Tab>('sessions');
   const sorted = useMemo(() => [...sessions].sort((a, b) => b.finishedAt - a.finishedAt), [sessions]);
   const pending = sessions.filter((s) => s.synced === 0).length;
 
   return (
     <div className="screen">
-      <header className="topbar">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to home">
-          ‹
-        </button>
+      <header className="topbar topbar-plain">
         <div className="topbar-title">
           <span className="topbar-sub">{sessions.length} workouts logged</span>
           <span>Stats</span>
         </div>
-        <button type="button" className="btn btn-small btn-secondary" disabled={sessions.length === 0} onClick={() => downloadCsv(sessions)}>
+        <button type="button" className="btn btn-small btn-secondary" disabled={sessions.length === 0} onClick={() => void downloadCsv(sessions)}>
           CSV
         </button>
       </header>
@@ -139,7 +118,13 @@ function SessionList({ sessions }: { sessions: Session[] }) {
                 <button
                   type="button"
                   className="btn btn-danger-text btn-block"
-                  onClick={() => confirm(`Delete the ${s.dayName} workout from ${fmtDate(s.finishedAt)}? This only deletes it from this phone.`) && db.sessions.delete(s.id)}
+                  onClick={async () =>
+                    (await ask(`Delete the ${s.dayName} workout from ${fmtDate(s.finishedAt)}?`, {
+                      body: s.synced ? 'It is deleted from this phone only. The rows in your Google Sheet stay.' : 'It was never synced, so this cannot be undone.',
+                      confirm: 'Delete workout',
+                      danger: true,
+                    })) && db.sessions.delete(s.id)
+                  }
                 >
                   Delete workout
                 </button>

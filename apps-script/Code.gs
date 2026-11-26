@@ -17,7 +17,9 @@
  * Request (POST, body is JSON sent as text/plain):
  *   { "token": "...", "ping": true }
  *   { "token": "...", "sessionId": "...", "rows": [[...]], "sets": [[...]], "session": [...] }
+ *   { "token": "...", "restore": true }   the app reads its workouts back, for a new or wiped phone
  * Response: { "ok": true, "appended": n } | { "ok": true, "duplicate": true } | { "ok": false, "error": "..." }
+ *   restore: { "ok": true, "sets": [[...]], "sessions": [[...]] }
  */
 
 var LOG_SHEET = 'Log';
@@ -53,6 +55,16 @@ function doPost(e) {
     if (body.token !== expected) return json_({ ok: false, error: 'Bad token' });
 
     if (body.ping) return json_({ ok: true, ping: true });
+
+    if (body.restore) {
+      var book = SpreadsheetApp.getActiveSpreadsheet();
+      useTimeZone_(book);
+      return json_({
+        ok: true,
+        sets: readRows_(book.getSheetByName(SETS_SHEET), SETS_HEADER.length),
+        sessions: readRows_(book.getSheetByName(SESSIONS_SHEET), SESSIONS_HEADER.length),
+      });
+    }
 
     var sessionId = String(body.sessionId || '');
     var rows = body.rows;
@@ -179,6 +191,25 @@ function appendRows_(sheet, rows, width) {
   var values = [];
   for (var i = 0; i < rows.length; i++) values.push(normalizeRow_(rows[i], width));
   sheet.getRange(sheet.getLastRow() + 1, 1, values.length, width).setValues(values);
+}
+
+/**
+ * Data rows of a tab for the app's restore. Dates come back as "YYYY-MM-DD". Any other cell that
+ * Sheets turned into a date or time (the start time) comes back as the text shown in the cell.
+ */
+function readRows_(sheet, width) {
+  var last = sheet ? sheet.getLastRow() : 0;
+  if (last < 2) return [];
+  var range = sheet.getRange(2, 1, last - 1, width);
+  var rows = range.getValues();
+  var shown = range.getDisplayValues();
+  for (var i = 0; i < rows.length; i++) {
+    rows[i][0] = dateKey_(rows[i][0]);
+    for (var j = 1; j < width; j++) {
+      if (Object.prototype.toString.call(rows[i][j]) === '[object Date]') rows[i][j] = shown[i][j];
+    }
+  }
+  return rows;
 }
 
 function normalizeRow_(row, width) {

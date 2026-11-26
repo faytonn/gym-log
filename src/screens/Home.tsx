@@ -13,9 +13,10 @@ interface Props {
   active: ActiveSession | null;
   pending: number;
   syncLabel: string | null;
+  /** Number of workouts that exist only on this phone, when a backup reminder is due. Otherwise 0. */
+  needsBackup: number;
   onStart: (dayId: string) => void;
   onResume: () => void;
-  onHistory: () => void;
   onMuscles: () => void;
   onSettings: () => void;
   onSync: () => void;
@@ -25,7 +26,7 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DELTS: Muscle[] = ['side-delts', 'rear-delts', 'front-delts'];
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-export function Home({ plan, sessions, active, pending, syncLabel, onStart, onResume, onHistory, onMuscles, onSettings, onSync }: Props) {
+export function Home({ plan, sessions, active, pending, syncLabel, needsBackup, onStart, onResume, onMuscles, onSettings, onSync }: Props) {
   const next = nextDayId(
     plan.days.map((d) => d.id),
     sessions,
@@ -107,6 +108,15 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
         </div>
       </section>
 
+      {needsBackup > 0 && (
+        <button type="button" className="panel notice" onClick={onSettings}>
+          <span className="lab">Backup</span>
+          <span>
+            {needsBackup} workout{needsBackup === 1 ? ' is' : 's are'} saved only on this phone. <u>Back up now</u>
+          </span>
+        </button>
+      )}
+
       {activeDay && (
         <button type="button" className="panel ticks resume" onClick={onResume}>
           <span className="lab">In progress · {countSets(active)} sets logged</span>
@@ -174,17 +184,6 @@ export function Home({ plan, sessions, active, pending, syncLabel, onStart, onRe
         )}
       </section>
 
-      <div className="home-nav">
-        <button type="button" className="btn" onClick={onHistory}>
-          Stats
-        </button>
-        <button type="button" className="btn" onClick={onMuscles}>
-          Muscles
-        </button>
-        <button type="button" className="btn" onClick={onSettings}>
-          Settings
-        </button>
-      </div>
     </div>
   );
 }

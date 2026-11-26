@@ -4,6 +4,7 @@ import { fmtKg, nextHint, setDelta, type LastEntry } from '../progression';
 import type { ActiveEntry, PlanExercise } from '../types';
 import { fmtDate, fmtDuration } from '../workout';
 import { BodyMap, type MapLevel } from './BodyMap';
+import { ask } from './Dialog';
 import { RepWheel } from './RepWheel';
 import { Sparkline } from './Sparkline';
 import { WeightField } from './WeightField';
@@ -141,8 +142,8 @@ export function ExerciseCard({ index, ex, entry, last, trend, restSeconds, expan
                     key={i}
                     className="line line-done"
                     aria-label={`Set ${i + 1}: ${fmtKg(set.weight)} kg, ${set.reps} reps. Tap to delete`}
-                    onClick={() => {
-                      if (confirm(`Delete set ${i + 1} (${fmtKg(set.weight)} kg × ${set.reps})?`)) onDeleteSet(i);
+                    onClick={async () => {
+                      if (await ask(`Delete set ${i + 1}?`, { body: `${fmtKg(set.weight)} kg × ${set.reps}`, confirm: 'Delete set', danger: true })) onDeleteSet(i);
                     }}
                   >
                     <span className="line-k">S{i + 1}</span>

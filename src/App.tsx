@@ -1,5 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { backupDue, onlyOnThisPhone } from './backup';
+import { DialogHost, ask } from './components/Dialog';
+import { TabBar, type TabName } from './components/TabBar';
 import { clearActive, commitSession, db, loadActive, loadPlan, requestPersistentStorage, saveActive } from './db';
 import { seedDemo } from './demo';
 import { DEMO } from './mode';
@@ -36,6 +39,7 @@ export function App() {
   const settings = useLiveQuery(async () => ({ ...DEFAULT_SETTINGS, ...((await db.kv.get('settings'))?.value as Partial<Settings>) }));
   const sessions = useLiveQuery(() => db.sessions.toArray());
   const pending = sessions?.filter((s) => s.synced === 0).length ?? 0;
+  const backedUpAt = useLiveQuery(async () => ((await db.kv.get('lastBackupAt'))?.value as number | undefined) ?? 0);
 
   // Boot: seed the plan on first run and reopen a workout that was in progress.
   useEffect(() => {
@@ -72,6 +76,11 @@ export function App() {
     }
   }, []);
 
+  // A new screen starts at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [route.name]);
+
   // Background retry of queued sessions.
   const pendingRef = useRef(0);
   pendingRef.current = pending;
@@ -92,14 +101,14 @@ export function App() {
     };
   }, [settings?.autoSync, settings?.syncUrl, settings?.syncToken, runSync]);
 
-  if (!ready || !plan || !settings || !sessions) return <div className="screen" />;
+  if (!ready || !plan || !settings || !sessions || backedUpAt === undefined) return <div className="screen" />;
 
-  const startDay = (dayId: string) => {
+  const startDay = async (dayId: string) => {
     if (active && active.dayId === dayId) return setRoute({ name: 'workout' });
     if (active) {
       const d = plan.days.find((x) => x.id === active.dayId);
       const n = countSets(active);
-      if (n > 0 && !confirm(`You have a ${d?.name ?? ''} workout in progress (${n} sets). Discard it and start a new one?`)) return;
+      if (n > 0 && !(await ask(`Discard the ${d?.name ?? ''} workout in progress?`, { body: `It has ${n} logged set${n === 1 ? '' : 's'}. Starting a new workout deletes them.`, confirm: 'Discard and start new', danger: true }))) return;
     }
     const day = plan.days.find((d) => d.id === dayId)!;
     const a = newActive(day, sessions);
@@ -119,10 +128,13 @@ export function App() {
     const day = plan.days.find((d) => d.id === active.dayId);
     if (!day) return;
     if (countSets(active) === 0) {
-      if (confirm('No sets logged. Discard this workout?')) await discard();
+      if (await ask('No sets logged', { body: 'There is nothing to save. Discard this workout?', confirm: 'Discard workout', danger: true })) await discard();
       return;
     }
-    if (!confirm('Finish and save this workout?')) return;
+    const planned = day.exercises.reduce((n, e) => n + e.sets, 0);
+    const done = countSets(active);
+    const left = planned - done;
+    if (!(await ask('Finish this workout?', { body: left > 0 ? `${done} of ${planned} planned sets are logged.` : `All ${planned} planned sets are logged.`, confirm: 'Finish and save' }))) return;
     const session = toSession(active, day);
     await commitSession(session);
     setActive(null);
@@ -132,65 +144,80 @@ export function App() {
   };
 
   const home = () => setRoute({ name: 'home' });
+  const settingsConfigured = Boolean(settings.syncUrl && settings.syncToken);
+  // A reminder is due only when workouts have no copy anywhere else and no sync will pick them up.
+  const needsBackup = !DEMO && !settingsConfigured && backupDue(sessions, backedUpAt, Date.now()) ? onlyOnThisPhone(sessions, backedUpAt).length : 0;
   const activeDay = active && plan.days.find((d) => d.id === active.dayId);
 
-  switch (route.name) {
-    case 'workout':
-      if (active && activeDay)
+  const screen = () => {
+    switch (route.name) {
+      case 'workout':
+        if (active && activeDay)
+          return (
+            <Workout
+              day={activeDay}
+              active={active}
+              sessions={sessions}
+              settings={settings}
+              update={updateActive}
+              onFinish={finish}
+              onDiscard={discard}
+              onBack={home}
+            />
+          );
+        // The day was deleted from the plan mid-workout.
         return (
-          <Workout
-            day={activeDay}
-            active={active}
-            sessions={sessions}
+          <div className="screen finished">
+            <p>This workout's day no longer exists in the plan.</p>
+            <button type="button" className="btn btn-block btn-secondary" onClick={discard}>
+              Discard it
+            </button>
+          </div>
+        );
+      case 'finished':
+        return (
+          <Finished
+            session={sessions.find((s) => s.id === route.sessionId)}
             settings={settings}
-            update={updateActive}
-            onFinish={finish}
-            onDiscard={discard}
-            onBack={home}
+            syncing={syncing}
+            syncLabel={syncLabel}
+            onSync={runSync}
+            onDone={home}
+            onSettings={() => setRoute({ name: 'settings' })}
           />
         );
-      // The day was deleted from the plan mid-workout.
-      return (
-        <div className="screen finished">
-          <p>This workout's day no longer exists in the plan.</p>
-          <button type="button" className="btn btn-block btn-secondary" onClick={discard}>
-            Discard it
-          </button>
-        </div>
-      );
-    case 'finished':
-      return (
-        <Finished
-          session={sessions.find((s) => s.id === route.sessionId)}
-          settings={settings}
-          syncing={syncing}
-          syncLabel={syncLabel}
-          onSync={runSync}
-          onDone={home}
-          onSettings={() => setRoute({ name: 'settings' })}
-        />
-      );
-    case 'history':
-      return <History plan={plan} sessions={sessions} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
-    case 'muscles':
-      return <Muscles plan={plan} sessions={sessions} onBack={home} />;
-    case 'settings':
-      return <SettingsScreen plan={plan} settings={settings} pending={pending} syncing={syncing} syncLabel={syncLabel} onSync={runSync} onBack={home} />;
-    default:
-      return (
-        <Home
-          plan={plan}
-          sessions={sessions}
-          active={active}
-          pending={pending}
-          syncLabel={syncing ? 'syncing…' : null}
-          onStart={startDay}
-          onResume={() => setRoute({ name: 'workout' })}
-          onHistory={() => setRoute({ name: 'history' })}
-          onMuscles={() => setRoute({ name: 'muscles' })}
-          onSettings={() => setRoute({ name: 'settings' })}
-          onSync={runSync}
-        />
-      );
-  }
+      case 'history':
+        return <History plan={plan} sessions={sessions} syncing={syncing} syncLabel={syncLabel} onSync={runSync} />;
+      case 'muscles':
+        return <Muscles plan={plan} sessions={sessions} />;
+      case 'settings':
+        return <SettingsScreen plan={plan} settings={settings} sessions={sessions} backedUpAt={backedUpAt} pending={pending} syncing={syncing} syncLabel={syncLabel} onSync={runSync} />;
+      default:
+        return (
+          <Home
+            plan={plan}
+            sessions={sessions}
+            active={active}
+            pending={pending}
+            syncLabel={syncing ? 'syncing…' : null}
+            needsBackup={needsBackup}
+            onStart={(dayId) => void startDay(dayId)}
+            onResume={() => setRoute({ name: 'workout' })}
+            onMuscles={() => setRoute({ name: 'muscles' })}
+            onSettings={() => setRoute({ name: 'settings' })}
+            onSync={runSync}
+          />
+        );
+    }
+  };
+
+  const tab: TabName | null = route.name === 'home' || route.name === 'history' || route.name === 'muscles' || route.name === 'settings' ? route.name : null;
+
+  return (
+    <>
+      {screen()}
+      {tab && <TabBar current={tab} onGo={(name) => setRoute({ name } as Route)} badge={{ settings: needsBackup > 0 }} />}
+      <DialogHost />
+    </>
+  );
 }

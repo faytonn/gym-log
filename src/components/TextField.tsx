@@ -18,9 +18,13 @@ export function TextField({ value, onCommit, ...rest }: Props) {
       value={text}
       onFocus={() => setFocused(true)}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
+      onBlur={(e) => {
         setFocused(false);
-        if (text !== value) onCommit(text);
+        // Save what the field shows. A password manager or autofill can change the field
+        // without a change event, and then `text` is not what the user sees.
+        const shown = e.currentTarget.value;
+        setText(shown);
+        if (shown !== value) onCommit(shown);
       }}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
     />

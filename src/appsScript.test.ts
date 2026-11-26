@@ -42,6 +42,9 @@ class FakeSheet {
       getValues() {
         return Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet.rows[row - 1 + i]?.[col - 1 + j] ?? ''));
       },
+      getDisplayValues() {
+        return this.getValues().map((r) => r.map((c) => (c instanceof Date ? `${c.getHours()}:${String(c.getMinutes()).padStart(2, '0')}` : String(c))));
+      },
       setFormula(f: string) {
         sheet.formulas.set(`${row},${col}`, f);
       },
@@ -164,6 +167,20 @@ describe('Apps Script doPost', () => {
     expect(env.post(payload(s))).toEqual({ ok: true, duplicate: true });
     expect(env.sheets.get('Log')!.rows).toHaveLength(2);
     expect(env.sheets.get('Sets')!.rows).toHaveLength(4);
+  });
+
+  it('returns the Sets and Sessions rows for a restore, with dates as text', () => {
+    const s = workout('s1', new Date(2026, 10, 14, 18, 0).getTime(), [['Lateral raise', 'weight', 5, [15, 14, 12]]]);
+    env.post(payload(s));
+    const r = env.post({ token: 'secret', restore: true });
+    expect(r.ok).toBe(true);
+    expect(r.sets).toEqual(sessionToSetRows(s, targets));
+    expect(r.sessions).toEqual([sessionSummaryRow(s)]);
+    expect(env.post({ token: 'nope', restore: true })).toEqual({ ok: false, error: 'Bad token' });
+  });
+
+  it('answers a restore on a sheet that has never been synced', () => {
+    expect(env.post({ token: 'secret', restore: true })).toEqual({ ok: true, sets: [], sessions: [] });
   });
 
   it('still works for a payload without sets (older app version)', () => {

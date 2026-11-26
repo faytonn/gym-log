@@ -6,7 +6,6 @@ import type { Plan, Session } from '../types';
 interface Props {
   plan: Plan;
   sessions: Session[];
-  onBack: () => void;
 }
 
 const BANDS: { band: VolumeBand; label: string }[] = [
@@ -18,7 +17,7 @@ const BANDS: { band: VolumeBand; label: string }[] = [
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-export function Muscles({ plan, sessions, onBack }: Props) {
+export function Muscles({ plan, sessions }: Props) {
   const [view, setView] = useState<'logged' | 'plan'>('logged');
   const weekStart = startOfWeek(Date.now());
 
@@ -41,10 +40,7 @@ export function Muscles({ plan, sessions, onBack }: Props) {
 
   return (
     <div className="screen">
-      <header className="topbar">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to home">
-          ‹
-        </button>
+      <header className="topbar topbar-plain">
         <div className="topbar-title">
           <span className="topbar-sub">Hard sets per muscle · week from {from}</span>
           <span>Muscles this week</span>

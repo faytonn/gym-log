@@ -19,6 +19,7 @@ An offline-first workout logger that runs as an installable web app. It tracks s
 - **Stats:** past sessions, progress per exercise with trend lines and charts, sets and volume per week, hard sets per muscle per week, every personal record, and CSV export.
 - **Editable plan:** days and exercises can be added, removed, reordered and edited in Settings.
 - **Google Sheets sync (optional):** finished sessions are queued locally and sent to an Apps Script web app. A failed sync never loses data.
+- **Backup and restore:** every workout, the plan and the settings can be saved to one file and restored on any phone. Workouts can also be restored from the Google Sheet.
 
 ## Progression logic
 
@@ -112,6 +113,15 @@ How it behaves:
 
 To update the script later, use **Deploy → Manage deployments → Edit → New version**. This keeps the same URL.
 
+## Backup and restore
+
+Workouts live in the browser's storage on one phone. They are gone if the app's data is cleared, the phone is lost, or the app is opened from a different browser. Two things protect them:
+
+- **Backup file:** **Settings → Backup → Save backup file** writes one JSON file with every workout, the plan and the settings. The sync token is left out. **Restore from file** adds the workouts the phone does not have and never changes the ones it has; replacing the plan is a separate choice. Keep the file outside the phone.
+- **Google Sheet:** with sync set up, **Restore from Google Sheet** rebuilds the workouts from the `Sets` and `Sessions` tabs. Start and end times are exact to the minute. This needs the current [`apps-script/Code.gs`](apps-script/Code.gs); update an older deployment as described above.
+
+Without sync, the Home screen shows a reminder after three workouts that are in no backup file, or when one has waited a week.
+
 ## Platform limits on iOS
 
 - Sound plays only after a user gesture, so the timer beep is unlocked when a set is saved. The silent switch mutes it.
@@ -128,6 +138,7 @@ src/progression.ts       double progression, history lookup, day rotation
 src/muscles.ts           muscle list, default mapping, weekly volume
 src/export.ts            sheet rows and CSV
 src/sync.ts              sync queue
+src/backup.ts            backup file, restore from file and from the sheet
 src/db.ts                IndexedDB storage
 src/screens/             Home, Workout, Finished, History, Muscles, Settings
 src/components/          ExerciseCard, BodyMap, RepWheel, WeightField, RestTimer, LineChart
